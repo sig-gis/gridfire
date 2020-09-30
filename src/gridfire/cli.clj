@@ -167,8 +167,7 @@
   [simulations landfire-rasters envelope cell-size ignition-row
    ignition-col max-runtime temperature relative-humidity wind-speed-20ft
    wind-from-direction foliar-moisture ellipse-adjustment-factor
-   outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-rasters
-   fetch-igntion-method]
+   outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-rasters]
   (mapv
    (fn [i]
      (let [equilibrium-moisture (calc-emc (relative-humidity i) (temperature i))
@@ -177,9 +176,8 @@
                                         :100hr (+ equilibrium-moisture 0.025)}
                                  :live {:herbaceous (* equilibrium-moisture 2.0)
                                         :woody      (* equilibrium-moisture 0.5)}}
-           ignition             (if fetch-ignition-method
-                                  ignition-rasters)
-                                  [(ignition-row i) (ignition-col i)]]
+           ignition             (or ignition-rasters
+                                    [(ignition-row i) (ignition-col i)])]
        (if-let [fire-spread-results (run-fire-spread (max-runtime i)
                                                      cell-size
                                                      landfire-rasters
