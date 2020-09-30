@@ -8,6 +8,8 @@
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
             [gridfire.fire-spread :refer [run-fire-spread]]
+            [gridfire.geotiff-bridge :refer [geotiff-raster-to-matrix]]
+            [gridfire.fetch :as fetch]
             [matrix-viz.core :refer [save-matrix-as-png]]
             [magellan.core :refer [register-new-crs-definitions-from-properties-file!
                                    make-envelope matrix-to-raster write-raster
@@ -46,41 +48,6 @@
                  (fn [matrix] (m/emap #(* % 3.28) matrix))) ; m -> ft
       (update-in [:crown-bulk-density :matrix]
                  (fn [matrix] (m/emap #(* % 0.0624) matrix))))) ; kg/m^3 -> lb/ft^3
-
-(defn geotiff-raster-to-matrix
-  "Reads a raster from a file using the magellan.core library. Returns the
-   post-processed raster values as a Clojure matrix using the core.matrix API
-   along with all of the georeferencing information associated with this tile in a
-   hash-map with the following form:
-  {:srid 900916,
-   :upperleftx -321043.875,
-   :upperlefty -1917341.5,
-   :width 486,
-   :height 534,
-   :scalex 2000.0,
-   :scaley -2000.0,
-   :skewx 0.0,
-   :skewy 0.0,
-   :numbands 1,
-   :matrix #vectorz/matrix Large matrix with shape: [534,486]}"
-  [file-path]
-  (let [raster   (read-raster file-path)
-        grid     (:grid raster)
-        r-info   (inspect/describe-raster raster)
-        matrix   (first (inspect/extract-matrix raster))
-        image    (:image r-info)
-        envelope (:envelope r-info)]
-    {:srid       (:srid r-info)
-     :upperleftx (get-in envelope [:x :min])
-     :upperlefty (get-in envelope [:y :min])
-     :width      (:width image)
-     :height     (:height image)
-     :scalex     (.getScaleX (.getGridToCRS2D grid))
-     :scaley     (.getScaleY (.getGridToCRS2D grid))
-     :skewx      0.0 ;FIXME not used?
-     :skewy      0.0 ;FIXME not used?
-     :numbands   (:bands image)
-     :matrix     (m/matrix matrix)}))
 
 (defmulti fetch-landfire-layers
   "Returns a map of LANDFIRE rasters (represented as maps) with the following units:
@@ -200,7 +167,8 @@
   [simulations landfire-rasters envelope cell-size ignition-row
    ignition-col max-runtime temperature relative-humidity wind-speed-20ft
    wind-from-direction foliar-moisture ellipse-adjustment-factor
-   outfile-suffix output-geotiffs? output-pngs? output-csvs?]
+   outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-rasters
+   fetch-igntion-method]
   (mapv
    (fn [i]
      (let [equilibrium-moisture (calc-emc (relative-humidity i) (temperature i))
@@ -208,7 +176,10 @@
                                         :10hr  (+ equilibrium-moisture 0.015)
                                         :100hr (+ equilibrium-moisture 0.025)}
                                  :live {:herbaceous (* equilibrium-moisture 2.0)
-                                        :woody      (* equilibrium-moisture 0.5)}}]
+                                        :woody      (* equilibrium-moisture 0.5)}}
+           ignition             (if fetch-ignition-method
+                                  ignition-rasters)
+                                  [(ignition-row i) (ignition-col i)]]
        (if-let [fire-spread-results (run-fire-spread (max-runtime i)
                                                      cell-size
                                                      landfire-rasters
@@ -217,8 +188,7 @@
                                                      fuel-moisture
                                                      (* 0.01 (foliar-moisture i))
                                                      (ellipse-adjustment-factor i)
-                                                     [(ignition-row i)
-                                                      (ignition-col i)])]
+                                                     ignition)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
                                  ["flame_length"        :flame-length-matrix]
@@ -304,6 +274,10 @@
           landfire-rasters (into {}
                                  (map (fn [[layer info]] [layer (:matrix info)]))
                                  landfire-layers)
+          ignition-layers  (fetch/initial-ignition-layers config)
+          ignition-rasters (into {}
+                                 (map (fn [[layer-name info]] [layer-name (:matrix info)]))
+                                 ignition-layers)
           envelope         (get-envelope config landfire-layers)
           simulations      (:simulations config)
           rand-generator   (if-let [seed (:random-seed config)]
@@ -330,7 +304,8 @@
             (:outfile-suffix config)
             (:output-geotiffs? config)
             (:output-pngs? config)
-            (:output-csvs? config))
+            (:output-csvs? config)
+            ignition-rasters)
            (write-csv-outputs
             (:output-csvs? config)
             (str "summary_stats" (:outfile-suffix config) ".csv"))))))

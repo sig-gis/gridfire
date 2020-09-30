@@ -144,7 +144,8 @@
                            (:outfile-suffix test-config-base)
                            (:output-geotiffs? test-config-base)
                            (:output-pngs? test-config-base)
-                           (:output-csvs? test-config-base))
+                           (:output-csvs? test-config-base)
+                           nil)
 
           geotiff-layers  (gf/fetch-landfire-layers geotiff-config)
           geotiff-results (gf/run-simulations
@@ -166,7 +167,8 @@
                            (:outfile-suffix test-config-base)
                            (:output-geotiffs? test-config-base)
                            (:output-pngs? test-config-base)
-                           (:output-csvs? test-config-base))]
+                           (:output-csvs? test-config-base)
+                           nil)]
 
       (is (every? some? postgis-results))
 

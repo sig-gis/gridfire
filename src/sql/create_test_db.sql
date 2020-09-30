@@ -6,6 +6,7 @@ CREATE DATABASE gridfire_test WITH OWNER gridfire_test;
 CREATE EXTENSION postgis;
 CREATE EXTENSION postgis_raster;
 CREATE SCHEMA landfire AUTHORIZATION gridfire_test;
+CREATE SCHEMA ignition AUTHORIZATION gridfire_test;
 
 INSERT INTO public.spatial_ref_sys (srid, auth_name, auth_srid, srtext, proj4text)
 VALUES (900914, 'user-generated', 900914,

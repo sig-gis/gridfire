@@ -36,6 +36,7 @@
                      {:PGPASSWORD password}
                      verbose
                      "sh ../../../resources/import_landfire_rasters.sh gridfire_test landfire"
+                     "sh ../../../resources/import_ignition_rasters.sh gridfire_test ignition"
                      "sh ../../../resources/update_landfire_srids.sh gridfire_test landfire 900914")
          (println))))
 
