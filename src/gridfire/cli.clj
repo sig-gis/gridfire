@@ -170,23 +170,26 @@
    outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-rasters]
   (mapv
    (fn [i]
-     (let [equilibrium-moisture (calc-emc (relative-humidity i) (temperature i))
-           fuel-moisture        {:dead {:1hr   (+ equilibrium-moisture 0.002)
-                                        :10hr  (+ equilibrium-moisture 0.015)
-                                        :100hr (+ equilibrium-moisture 0.025)}
-                                 :live {:herbaceous (* equilibrium-moisture 2.0)
-                                        :woody      (* equilibrium-moisture 0.5)}}
-           ignition             (or ignition-rasters
-                                    [(ignition-row i) (ignition-col i)])]
-       (if-let [fire-spread-results (run-fire-spread (max-runtime i)
-                                                     cell-size
-                                                     landfire-rasters
-                                                     (wind-speed-20ft i)
-                                                     (wind-from-direction i)
-                                                     fuel-moisture
-                                                     (* 0.01 (foliar-moisture i))
-                                                     (ellipse-adjustment-factor i)
-                                                     ignition)]
+     (let [equilibrium-moisture  (calc-emc (relative-humidity i) (temperature i))
+           fuel-moisture         {:dead {:1hr   (+ equilibrium-moisture 0.002)
+                                         :10hr  (+ equilibrium-moisture 0.015)
+                                         :100hr (+ equilibrium-moisture 0.025)}
+                                  :live {:herbaceous (* equilibrium-moisture 2.0)
+                                         :woody      (* equilibrium-moisture 0.5)}}
+           initial-ignition-site (or ignition-rasters
+                                     [(ignition-row i) (ignition-col i)])]
+       (if-let [fire-spread-results (run-fire-spread
+                                     {:max-runtime               (max-runtime i)
+                                      :cell-size                 cell-size
+                                      :landfire-layers           landfire-rasters
+                                      :wind-speed-20ft           (wind-speed-20ft i)
+                                      :wind-from-direction       (wind-from-direction i)
+                                      :fuel-moisture             fuel-moisture
+                                      :foliar-moisture           (* 0.01 (foliar-moisture i))
+                                      :ellipse-adjustment-factor (ellipse-adjustment-factor i)
+                                      :num-rows                  (m/row-count (:fuel-model landfire-rasters))
+                                      :num-cols                  (m/row-count (:fuel-model landfire-rasters))}
+                                     initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
                                  ["flame_length"        :flame-length-matrix]

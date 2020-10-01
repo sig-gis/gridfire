@@ -1,7 +1,8 @@
 (ns gridfire.ignition-test
   (:require [clojure.test :refer [deftest testing is]]
             [gridfire.fetch :as fetch]
-            [gridfire.cli :as gf]))
+            [gridfire.cli :as gf])
+  (:import (java.util Random)))
 
 ;;-----------------------------------------------------------------------------
 ;; Config
@@ -17,14 +18,14 @@
 
 (def test-config-base
   {:db-spec                   db-spec
-   :landfire-layers           {:aspect             "landfire.asp WHERE rid=100"
-                               :canopy-base-height "landfire.cbh WHERE rid=100"
-                               :canopy-cover       "landfire.cc WHERE rid=100"
-                               :canopy-height      "landfire.ch WHERE rid=100"
-                               :crown-bulk-density "landfire.cbd WHERE rid=100"
-                               :fuel-model         "landfire.fbfm40 WHERE rid=100"
-                               :slope              "landfire.slp WHERE rid=100"
-                               :elevation          "landfire.dem WHERE rid=100"}
+   :landfire-layers           {:aspect             "landfire.asp WHERE rid=1"
+                               :canopy-base-height "landfire.cbh WHERE rid=1"
+                               :canopy-cover       "landfire.cc WHERE rid=1"
+                               :canopy-height      "landfire.ch WHERE rid=1"
+                               :crown-bulk-density "landfire.cbd WHERE rid=1"
+                               :fuel-model         "landfire.fbfm40 WHERE rid=1"
+                               :slope              "landfire.slp WHERE rid=1"
+                               :elevation          "landfire.dem WHERE rid=1"}
    :srid                      "CUSTOM:900914"
    :cell-size                 98.425     ;; (feet)
    :max-runtime               60         ;; (minutes)
@@ -51,8 +52,8 @@
 ;; Tests
 ;;-----------------------------------------------------------------------------
 
-(deftest ignition-rasters-geotiff-test
-  (testing "Running Siulation with ignition rasters via geotiff files"
+(deftest fetch-ignition-layers-test
+  (testing "Fetching ignition layers from postgis and geotiff files"
     (let [geotiff-config (merge
                           test-config-base
                           {:fetch-ignition-method
@@ -81,4 +82,46 @@
              (get-in geotiff-ignition-layers [:initial-fire-line-intensity :matrix])))
 
       (is (= (get-in postgis-ignition-layers [:initial-flame-length :matrix])
-               (get-in geotiff-ignition-layers [:initial-flame-length :matrix]))))))
+             (get-in geotiff-ignition-layers [:initial-flame-length :matrix]))))))
+
+
+(deftest run-simulation-test
+  (testing "Running simulation with ignition layers read from geotiff files"
+    (let [geotiff-config (merge
+                          test-config-base
+                          {:fetch-ignition-method
+                           :geotiff
+
+                           :ignition-layers
+                           {:initial-fire-spread         (in-file-path "scar.tif")
+                            :initial-fire-line-intensity (in-file-path "ifi.tif")
+                            :initial-flame-length        (in-file-path "ifl.tif")}})
+          simulations      (:simulations test-config-base)
+          rand-generator   (if-let [seed (:random-seed test-config-base)]
+                             (Random. seed)
+                             (Random.))
+          landfire-layers  (gf/fetch-landfire-layers geotiff-config)
+          landfire-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
+          ignition-layers  (fetch/initial-ignition-layers geotiff-config)
+          ignition-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) ignition-layers)
+          results          (gf/run-simulations
+                            simulations
+                            landfire-rasters
+                            (gf/get-envelope geotiff-config landfire-layers)
+                            (:cell-size test-config-base)
+                            (gf/draw-samples rand-generator simulations (:ignition-row test-config-base))
+                            (gf/draw-samples rand-generator simulations (:ignition-col test-config-base))
+                            (gf/draw-samples rand-generator simulations (:max-runtime test-config-base))
+                            (gf/draw-samples rand-generator simulations (:temperature test-config-base))
+                            (gf/draw-samples rand-generator simulations (:relative-humidity test-config-base))
+                            (gf/draw-samples rand-generator simulations (:wind-speed-20ft test-config-base))
+                            (gf/draw-samples rand-generator simulations (:wind-from-direction test-config-base))
+                            (gf/draw-samples rand-generator simulations (:foliar-moisture test-config-base))
+                            (gf/draw-samples rand-generator simulations (:ellipse-adjustment-factor test-config-base))
+                            (:outfile-suffix test-config-base)
+                            (:output-geotiffs? test-config-base)
+                            (:output-pngs? test-config-base)
+                            (:output-csvs? test-config-base)
+                            ignition-rasters)]
+
+      (is (every? some? results)))))

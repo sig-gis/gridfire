@@ -11,10 +11,10 @@
 
 (defmulti initial-ignition-layers
   "Returns a map of ignition rasters (represented as maps):
-  {:initial-fire-spread
-   :initial-flame-length
-   :initial-fire-line-intensity}"
-  (fn [config layer-names]
+  {:initial-fire-spread         raster-map
+   :initial-flame-length        raster-map
+   :initial-fire-line-intensity raster-map}"
+  (fn [config]
     (:fetch-ignition-method config)))
 
 (defmethod initial-ignition-layers :postgis
@@ -28,7 +28,7 @@
    ignition-names))
 
 (defmethod initial-ignition-layers :geotiff
-  [{:keys [ignition-layers]}]
+  [{:keys [ignition-layers] :as config}]
   (reduce
    (fn [amap ignition-name]
      (let [geotiff (ignition-layers ignition-name)
