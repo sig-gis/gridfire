@@ -205,6 +205,7 @@
              (merge
               {:ignition-row              (ignition-row i)
                :ignition-col              (ignition-col i)
+               :ignition-rasters           ignition-rasters
                :max-runtime               (max-runtime i)
                :temperature               (temperature i)
                :relative-humidity         (relative-humidity i)
@@ -216,6 +217,7 @@
          (when output-csvs?
            {:ignition-row               (ignition-row i)
             :ignition-col               (ignition-col i)
+            :ignition-rasters           ignition-rasters
             :max-runtime                (max-runtime i)
             :temperature                (temperature i)
             :relative-humidity          (relative-humidity i)

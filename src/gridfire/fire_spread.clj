@@ -245,37 +245,35 @@
    fire-spread-matrix
    flame-length-matrix
    fire-line-intensity-matrix]
-  (do
-    (prn "running loop...")
-   (loop [global-clock  0.0
-          ignited-cells ignited-cells]
-     (if (and (< global-clock max-runtime)
-              (seq ignited-cells))
-       (let [dt              (->> ignited-cells
-                                  (vals)
-                                  (apply concat)
-                                  (map :spread-rate)
-                                  (reduce max 0.0)
-                                  (/ cell-size))
-             timestep        (if (> (+ global-clock dt) max-runtime)
-                               (- max-runtime global-clock)
-                               dt)
-             ignition-events (identify-ignition-events ignited-cells timestep)]
-         ;; [{:cell :trajectory :fractional-distance
-         ;;   :flame-length :fire-line-intensity} ...]
-         (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]
-           (let [[i j] cell]
-             (m/mset! fire-spread-matrix         i j 1.0)
-             (m/mset! flame-length-matrix        i j flame-length)
-             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)))
-         (recur (+ global-clock timestep)
-                (update-ignited-cells constants fire-spread-matrix)))
-       {:global-clock               global-clock
-        :initial-ignition-site      initial-ignition-site
-        :ignited-cells              (keys ignited-cells)
-        :fire-spread-matrix         fire-spread-matrix
-        :flame-length-matrix        flame-length-matrix
-        :fire-line-intensity-matrix fire-line-intensity-matrix}))))
+  (loop [global-clock  0.0
+         ignited-cells ignited-cells]
+    (if (and (< global-clock max-runtime)
+             (seq ignited-cells))
+      (let [dt              (->> ignited-cells
+                                 (vals)
+                                 (apply concat)
+                                 (map :spread-rate)
+                                 (reduce max 0.0)
+                                 (/ cell-size))
+            timestep        (if (> (+ global-clock dt) max-runtime)
+                              (- max-runtime global-clock)
+                              dt)
+            ignition-events (identify-ignition-events ignited-cells timestep)]
+        ;; [{:cell :trajectory :fractional-distance
+        ;;   :flame-length :fire-line-intensity} ...]
+        (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]
+          (let [[i j] cell]
+            (m/mset! fire-spread-matrix         i j 1.0)
+            (m/mset! flame-length-matrix        i j flame-length)
+            (m/mset! fire-line-intensity-matrix i j fire-line-intensity)))
+        (recur (+ global-clock timestep)
+               (update-ignited-cells constants fire-spread-matrix)))
+      {:global-clock               global-clock
+       :initial-ignition-site      initial-ignition-site
+       :ignited-cells              (keys ignited-cells)
+       :fire-spread-matrix         fire-spread-matrix
+       :flame-length-matrix        flame-length-matrix
+       :fire-line-intensity-matrix fire-line-intensity-matrix})))
 
 (defmulti run-fire-spread
   "Runs the raster-based fire spread model with a map of these arguments:
@@ -340,8 +338,7 @@
                                            0.0)}})
                 fire-spread-matrix
                 flame-length-matrix
-                fire-line-intensity-matrix
-                ))))
+                fire-line-intensity-matrix))))
 
 (defn- non-zero-indices
   [m]
@@ -374,6 +371,5 @@
                 :ignited-cells         ignited-cells})
               fire-spread-matrix
               flame-length-matrix
-              fire-line-intensity-matrix
-              )))
+              fire-line-intensity-matrix)))
 ;; fire-spread-algorithm ends here
