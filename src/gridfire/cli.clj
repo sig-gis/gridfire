@@ -176,8 +176,9 @@
                                          :100hr (+ equilibrium-moisture 0.025)}
                                   :live {:herbaceous (* equilibrium-moisture 2.0)
                                          :woody      (* equilibrium-moisture 0.5)}}
-           initial-ignition-site (or ignition-rasters
-                                     [(ignition-row i) (ignition-col i)])]
+           initial-ignition-site (if (seq ignition-rasters)
+                                   ignition-rasters
+                                   [(ignition-row i) (ignition-col i)])]
        (if-let [fire-spread-results (run-fire-spread
                                      {:max-runtime               (max-runtime i)
                                       :cell-size                 cell-size
@@ -205,7 +206,7 @@
              (merge
               {:ignition-row              (ignition-row i)
                :ignition-col              (ignition-col i)
-               :ignition-rasters           ignition-rasters
+               :ignition-rasters          ignition-rasters
                :max-runtime               (max-runtime i)
                :temperature               (temperature i)
                :relative-humidity         (relative-humidity i)
@@ -269,6 +270,14 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
+(defn get-ignition-rasters [layers]
+  (let [ignition-rasters (into {}
+                               (map (fn [[layer-name info]] [layer-name (:matrix info)]))
+                               layers)]
+    (if (seq ignition-rasters)
+      ignition-rasters
+      nil)))
+
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
@@ -278,14 +287,13 @@
                                  (map (fn [[layer info]] [layer (:matrix info)]))
                                  landfire-layers)
           ignition-layers  (fetch/initial-ignition-layers config)
-          ignition-rasters (into {}
-                                 (map (fn [[layer-name info]] [layer-name (:matrix info)]))
-                                 ignition-layers)
+          ignition-rasters (get-ignition-rasters ignition-layers)
           envelope         (get-envelope config landfire-layers)
           simulations      (:simulations config)
           rand-generator   (if-let [seed (:random-seed config)]
                              (Random. seed)
                              (Random.))]
+      (prn envelope)
       (when (:output-landfire-inputs? config)
         (doseq [[layer matrix] landfire-rasters]
           (-> (matrix-to-raster (name layer) matrix envelope)
