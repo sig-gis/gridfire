@@ -1,9 +1,7 @@
 ;; [[file:../../org/GridFire.org::*Magellan][Magellan:1]]
 (ns gridfire.geotiff-bridge
   (:require [clojure.core.matrix :as m]
-            [magellan.core :refer [register-new-crs-definitions-from-properties-file!
-                                   make-envelope matrix-to-raster write-raster
-                                   read-raster]]
+            [magellan.core :refer [read-raster]]
             [magellan.raster.inspect :as inspect]))
 
 (defn geotiff-raster-to-matrix
