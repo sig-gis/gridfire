@@ -1,3 +1,4 @@
+;; [[file:../../org/GridFire.org::*Magellan][Magellan:1]]
 (ns gridfire.geotiff-bridge
   (:require [clojure.core.matrix :as m]
             [magellan.core :refer [register-new-crs-definitions-from-properties-file!
@@ -39,3 +40,4 @@
      :skewy      0.0 ;FIXME not used?
      :numbands   (:bands image)
      :matrix     (m/matrix matrix)}))
+;; Magellan:1 ends here

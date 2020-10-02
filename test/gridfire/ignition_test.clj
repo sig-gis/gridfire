@@ -38,8 +38,7 @@
    :simulations               1
    :random-seed               1234567890 ;; long value (optional)
    :output-csvs?              true
-   :fetch-layer-method        :postgis
-   })
+   :fetch-layer-method        :postgis})
 
 ;;-----------------------------------------------------------------------------
 ;; Utils
@@ -47,6 +46,35 @@
 
 (defn in-file-path [filename]
   (str resources-path filename))
+
+(defn run-simulation [config]
+  (let [simulations      (:simulations config)
+        rand-generator   (if-let [seed (:random-seed config)]
+                           (Random. seed)
+                           (Random.))
+        landfire-layers  (gf/fetch-landfire-layers config)
+        landfire-matrix  (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
+        ignition-layers  (fetch/initial-ignition-layers config)
+        ignition-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) ignition-layers)]
+    (gf/run-simulations
+     simulations
+     landfire-matrix
+     (gf/get-envelope config landfire-layers)
+     (:cell-size config)
+     (gf/draw-samples rand-generator simulations (:ignition-row config))
+     (gf/draw-samples rand-generator simulations (:ignition-col config))
+     (gf/draw-samples rand-generator simulations (:max-runtime config))
+     (gf/draw-samples rand-generator simulations (:temperature config))
+     (gf/draw-samples rand-generator simulations (:relative-humidity config))
+     (gf/draw-samples rand-generator simulations (:wind-speed-20ft config))
+     (gf/draw-samples rand-generator simulations (:wind-from-direction config))
+     (gf/draw-samples rand-generator simulations (:foliar-moisture config))
+     (gf/draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
+     (:outfile-suffix config)
+     (:output-geotiffs? config)
+     (:output-pngs? config)
+     (:output-csvs? config)
+     ignition-rasters)))
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
@@ -84,17 +112,17 @@
 
 (deftest omit-ignition-method-test
   (testing "Omitting fetch-igntion-method key in config"
-   (let [geotiff-config          (merge test-config-base
-                                        {:ignition-layers
-                                         {:initial-fire-spread         (in-file-path "scar.tif")
-                                          :initial-fire-line-intensity (in-file-path "ifi.tif")
-                                          :initial-flame-length        (in-file-path "ifl.tif")}})
-         geotiff-ignition-layers (fetch/initial-ignition-layers geotiff-config)]
+    (let [geotiff-config          (merge test-config-base
+                                         {:ignition-layers
+                                          {:initial-fire-spread         (in-file-path "scar.tif")
+                                           :initial-fire-line-intensity (in-file-path "ifi.tif")
+                                           :initial-flame-length        (in-file-path "ifl.tif")}})
+          geotiff-ignition-layers (fetch/initial-ignition-layers geotiff-config)]
 
-     (is (nil? geotiff-ignition-layers)))))
+      (is (nil? geotiff-ignition-layers)))))
 
 
-(deftest run-simulation-test
+(deftest geotiff-ignition-test
   (testing "Running simulation with ignition layers read from geotiff files"
     (let [geotiff-config (merge test-config-base
                                 {:fetch-ignition-method
@@ -104,32 +132,19 @@
                                  {:initial-fire-spread         (in-file-path "scar.tif")
                                   :initial-fire-line-intensity (in-file-path "ifi.tif")
                                   :initial-flame-length        (in-file-path "ifl.tif")}})
-          simulations      (:simulations test-config-base)
-          rand-generator   (if-let [seed (:random-seed test-config-base)]
-                             (Random. seed)
-                             (Random.))
-          landfire-layers  (gf/fetch-landfire-layers geotiff-config)
-          landfire-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
-          ignition-layers  (fetch/initial-ignition-layers geotiff-config)
-          ignition-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) ignition-layers)
-          results          (gf/run-simulations
-                            simulations
-                            landfire-rasters
-                            (gf/get-envelope geotiff-config landfire-layers)
-                            (:cell-size test-config-base)
-                            (gf/draw-samples rand-generator simulations (:ignition-row test-config-base))
-                            (gf/draw-samples rand-generator simulations (:ignition-col test-config-base))
-                            (gf/draw-samples rand-generator simulations (:max-runtime test-config-base))
-                            (gf/draw-samples rand-generator simulations (:temperature test-config-base))
-                            (gf/draw-samples rand-generator simulations (:relative-humidity test-config-base))
-                            (gf/draw-samples rand-generator simulations (:wind-speed-20ft test-config-base))
-                            (gf/draw-samples rand-generator simulations (:wind-from-direction test-config-base))
-                            (gf/draw-samples rand-generator simulations (:foliar-moisture test-config-base))
-                            (gf/draw-samples rand-generator simulations (:ellipse-adjustment-factor test-config-base))
-                            (:outfile-suffix test-config-base)
-                            (:output-geotiffs? test-config-base)
-                            (:output-pngs? test-config-base)
-                            (:output-csvs? test-config-base)
-                            ignition-rasters)]
+          results (run-simulation geotiff-config)]
 
+      (is (every? some? results)))))
+
+(deftest postgis-ignition-test
+  (testing "Running simulation with ignition layers read from geotiff files"
+    (let [geotiff-config (merge test-config-base
+                                {:fetch-ignition-method
+                                 :postgis
+
+                                 :ignition-layers
+                                 {:initial-fire-spread         "ignition.scar WHERE rid=1"
+                                  :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
+                                  :initial-flame-length        "ignition.ifl WHERE rid=1"}})
+          results (run-simulation geotiff-config)]
       (is (every? some? results)))))

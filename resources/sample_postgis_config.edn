@@ -1,23 +1,27 @@
 ;; [[file:../org/GridFire.org::sample_postgis_config.edn][sample_postgis_config.edn]]
 {
  ;; Section 1: Landscape data to be shared by all simulations
- :db-spec                     {:classname   "org.postgresql.Driver"
-                               :subprotocol "postgresql"
-                               :subname     "//localhost:5432/gridfire"
-                               :user        "gridfire"}
- :landfire-layers             {:aspect             "landfire.asp WHERE rid=100"
-                               :canopy-base-height "landfire.cbh WHERE rid=100"
-                               :canopy-cover       "landfire.cc WHERE rid=100"
-                               :canopy-height      "landfire.ch WHERE rid=100"
-                               :crown-bulk-density "landfire.cbd WHERE rid=100"
-                               :fuel-model         "landfire.fbfm40 WHERE rid=100"
-                               :slope              "landfire.slp WHERE rid=100"
-                               :elevation          "landfire.dem WHERE rid=100"}
- :srid                        "CUSTOM:900914"
- :cell-size                   98.425 ;; (feet)
+ :fetch-layer-method        :postgis
+ :db-spec                   {:classname   "org.postgresql.Driver"
+                             :subprotocol "postgresql"
+                             :subname     "//localhost:5432/gridfire"
+                             :user        "gridfire"}
+ :landfire-layers           {:aspect             "landfire.asp WHERE rid=100"
+                             :canopy-base-height "landfire.cbh WHERE rid=100"
+                             :canopy-cover       "landfire.cc WHERE rid=100"
+                             :canopy-height      "landfire.ch WHERE rid=100"
+                             :crown-bulk-density "landfire.cbd WHERE rid=100"
+                             :fuel-model         "landfire.fbfm40 WHERE rid=100"
+                             :slope              "landfire.slp WHERE rid=100"
+                             :elevation          "landfire.dem WHERE rid=100"}
+ :srid                      "CUSTOM:900914"
+ :cell-size                 98.425         ;; (feet)
 
  ;; Section 2: Ignition and weather data from which to build simulation inputs
- ;;
+ :ignition-row              [10 90]
+ :ignition-col              [20 80]
+
+ ;; Section 3: Weather data from which to build simulation inputs
  ;; For all options in this section, you may enter values in one of three ways:
  ;;   1. Single Value: 25
  ;;   2. List of Values: (2 17 9)
@@ -26,26 +30,23 @@
  ;; If a single value is provided, it will be kept the same for all simulations.
  ;; For a list of values, the list will be randomly sampled from in each simulation.
  ;; For a range of values, the range [inclusive exclusive] will be randomly sampled from in each simulation.
- :ignition-row                [10 90]
- :ignition-col                [20 80]
- :max-runtime                 60 ;; (minutes)
- :temperature                 (50 65 80) ;; (degrees Fahrenheit)
- :relative-humidity           (1 10 20) ;; (%)
- :wind-speed-20ft             (10 15 20) ;; (miles/hour)
- :wind-from-direction         (0 90 180 270) ;; (degrees clockwise from north)
- :foliar-moisture             90 ;; (%)
- :ellipse-adjustment-factor   1.0 ;; (< 1.0 = more circular, > 1.0 = more elliptical)
+ :max-runtime               60             ;; (minutes)
+ :temperature               (50 65 80)     ;; (degrees Fahrenheit)
+ :relative-humidity         (1 10 20)      ;; (%)
+ :wind-speed-20ft           (10 15 20)     ;; (miles/hour)
+ :wind-from-direction       (0 90 180 270) ;; (degrees clockwise from north)
+ :foliar-moisture           90             ;; (%)
+ :ellipse-adjustment-factor 1.0            ;; (< 1.0 = more circular, > 1.0 = more elliptical)
 
- ;; Section 3: Number of simulations and (optional) random seed parameter
- :simulations                 10
- :random-seed                 1234567890 ;; long value (optional)
+ ;; Section 4: Number of simulations and (optional) random seed parameter
+ :simulations               10
+ :random-seed               1234567890     ;; long value (optional)
 
- ;; Section 4: Types and names of outputs
- :outfile-suffix              "_tile_100"
- :output-landfire-inputs?     true
- :output-geotiffs?            true
- :output-pngs?                true
- :output-csvs?                true
- :fetch-layer-method          :postgis
-}
+ ;; Section 5: Types and names of outputs
+ :outfile-suffix            "_tile_100"
+ :output-landfire-inputs?   true
+ :output-geotiffs?          true
+ :output-pngs?              true
+ :output-csvs?              true
+ }
 ;; sample_postgis_config.edn ends here

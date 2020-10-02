@@ -1902,9 +1902,21 @@ pseudo-code lays out the steps taken in this procedure:
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
   :terrain-distance ft, :spread-rate ft/min, :fire-line-intensity Btu/ft/s, :flame-length ft,
   :fractional-distance [0-1]}, one for each cell adjacent to here."
-  [fire-spread-matrix landfire-layers wind-speed-20ft wind-from-direction fuel-moisture
-   foliar-moisture ellipse-adjustment-factor cell-size num-rows num-cols [i j :as here]
-   overflow-trajectory overflow-heat]
+  [{:keys
+    [landfire-layers
+     wind-speed-20ft
+     wind-from-direction
+     fuel-moisture
+     foliar-moisture
+     ellipse-adjustment-factor
+     cell-size
+     num-rows
+     num-cols] :as params}
+   fire-spread-matrix
+   [i j :as here]
+   overflow-trajectory
+   overflow-heat]
+
   (let [fuel-model-number   (m/mget (:fuel-model         landfire-layers) i j)
         slope               (m/mget (:slope              landfire-layers) i j)
         aspect              (m/mget (:aspect             landfire-layers) i j)
@@ -1970,10 +1982,10 @@ pseudo-code lays out the steps taken in this procedure:
        (into [])))
 
 (defn update-ignited-cells
-  [ignited-cells ignition-events fire-spread-matrix fuel-model-matrix landfire-layers
-   wind-speed-20ft wind-from-direction fuel-moisture foliar-moisture ellipse-adjustment-factor
-   cell-size num-rows num-cols]
-  (let [newly-ignited-cells (into #{} (map :cell) ignition-events)]
+  [{:keys [ignited-cells ignition-events landfire-layers num-rows num-cols] :as constants}
+   fire-spread-matrix]
+  (let [newly-ignited-cells (into #{} (map :cell) ignition-events)
+        fuel-model-matrix (:fuel-model landfire-layers)]
     (into {}
           (concat
            (for [[cell spread-info] ignited-cells
@@ -1984,108 +1996,143 @@ pseudo-code lays out the steps taken in this procedure:
                  :when (burnable-neighbors? fire-spread-matrix fuel-model-matrix
                                             num-rows num-cols cell)]
              [cell (compute-neighborhood-fire-spread-rates!
+                    constants
                     fire-spread-matrix
-                    landfire-layers
-                    wind-speed-20ft
-                    wind-from-direction
-                    fuel-moisture
-                    foliar-moisture
-                    ellipse-adjustment-factor
-                    cell-size
-                    num-rows
-                    num-cols
                     cell
                     trajectory
                     (- fractional-distance 1.0))])))))
 
-(defn run-fire-spread
-  "Runs the raster-based fire spread model with these arguments:
+(defn run-loop
+  [{:keys [max-runtime cell-size global-clock ignited-cells initial-ignition-site] :as constants}
+   fire-spread-matrix
+   flame-length-matrix
+   fire-line-intensity-matrix]
+  (loop [global-clock  0.0
+         ignited-cells ignited-cells]
+    (if (and (< global-clock max-runtime)
+             (seq ignited-cells))
+      (let [dt              (->> ignited-cells
+                                 (vals)
+                                 (apply concat)
+                                 (map :spread-rate)
+                                 (reduce max 0.0)
+                                 (/ cell-size))
+            timestep        (if (> (+ global-clock dt) max-runtime)
+                              (- max-runtime global-clock)
+                              dt)
+            ignition-events (identify-ignition-events ignited-cells timestep)]
+        ;; [{:cell :trajectory :fractional-distance
+        ;;   :flame-length :fire-line-intensity} ...]
+        (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]
+          (let [[i j] cell]
+            (m/mset! fire-spread-matrix         i j 1.0)
+            (m/mset! flame-length-matrix        i j flame-length)
+            (m/mset! fire-line-intensity-matrix i j fire-line-intensity)))
+        (recur (+ global-clock timestep)
+               (update-ignited-cells constants fire-spread-matrix)))
+      {:global-clock               global-clock
+       :initial-ignition-site      initial-ignition-site
+       :ignited-cells              (keys ignited-cells)
+       :fire-spread-matrix         fire-spread-matrix
+       :flame-length-matrix        flame-length-matrix
+       :fire-line-intensity-matrix fire-line-intensity-matrix})))
+
+(defmulti run-fire-spread
+  "Runs the raster-based fire spread model with a map of these arguments:
   - max-runtime: double (minutes)
   - cell-size: double (feet)
-  - elevation-matrix: core.matrix 2D double array (feet)
-  - slope-matrix: core.matrix 2D double array (vertical feet/horizontal feet)
-  - aspect-matrix: core.matrix 2D double array (degrees clockwise from north)
-  - fuel-model-matrix: core.matrix 2D double array (fuel model numbers 1-256)
-  - canopy-height-matrix: core.matrix 2D double array (feet)
-  - canopy-base-height-matrix: core.matrix 2D double array (feet)
-  - crown-bulk-density-matrix: core.matrix 2D double array (lb/ft^3)
-  - canopy-cover-matrix: core.matrix 2D double array (0-100)
+  - landfire-layers: Consisting of these matrices
+    - elevation-matrix: core.matrix 2D double array (feet)
+    - slope-matrix: core.matrix 2D double array (vertical feet/horizontal feet)
+    - aspect-matrix: core.matrix 2D double array (degrees clockwise from north)
+    - fuel-model-matrix: core.matrix 2D double array (fuel model numbers 1-256)
+    - canopy-height-matrix: core.matrix 2D double array (feet)
+    - canopy-base-height-matrix: core.matrix 2D double array (feet)
+    - crown-bulk-density-matrix: core.matrix 2D double array (lb/ft^3)
+    - canopy-cover-matrix: core.matrix 2D double array (0-100)
   - wind-speed-20ft: double (miles/hour)
   - wind-from-direction: double (degrees clockwise from north)
   - fuel-moisture: doubles (%){:dead {:1hr :10hr :100hr} :live {:herbaceous :woody}}
   - foliar-moisture: double (%)
   - ellipse-adjustment-factor: (< 1.0 = more circular, > 1.0 = more elliptical)
-  - initial-ignition-site: point represented as [row col] (randomly chosen if omitted)"
-  ([max-runtime cell-size landfire-layers wind-speed-20ft wind-from-direction
-    fuel-moisture foliar-moisture ellipse-adjustment-factor]
-   (let [ignition-site (select-random-ignition-site (:fuel-model landfire-layers))]
-     (run-fire-spread max-runtime cell-size landfire-layers wind-speed-20ft
-                      wind-from-direction fuel-moisture foliar-moisture
-                      ellipse-adjustment-factor ignition-site)))
-  ([max-runtime cell-size landfire-layers wind-speed-20ft wind-from-direction
-    fuel-moisture foliar-moisture ellipse-adjustment-factor
-    [i j :as initial-ignition-site]]
-   ;;(println "Fire ignited at" initial-ignition-site)
-   (let [fuel-model-matrix          (:fuel-model landfire-layers)
-         num-rows                   (m/row-count fuel-model-matrix)
-         num-cols                   (m/column-count fuel-model-matrix)
-         fire-spread-matrix         (m/zero-matrix num-rows num-cols)
-         flame-length-matrix        (m/zero-matrix num-rows num-cols)
-         fire-line-intensity-matrix (m/zero-matrix num-rows num-cols)]
-     (when (and (in-bounds? num-rows num-cols initial-ignition-site)
-                (burnable-fuel-model? (m/mget fuel-model-matrix i j))
-                (burnable-neighbors? fire-spread-matrix fuel-model-matrix
-                                     num-rows num-cols initial-ignition-site))
-       ;; initialize the ignition site
-       (m/mset! fire-spread-matrix i j 1.0)
-       (m/mset! flame-length-matrix i j 1.0)
-       (m/mset! fire-line-intensity-matrix i j 1.0)
-       (loop [global-clock  0.0
-              ignited-cells {initial-ignition-site (compute-neighborhood-fire-spread-rates!
-                                                    fire-spread-matrix
-                                                    landfire-layers
-                                                    wind-speed-20ft
-                                                    wind-from-direction
-                                                    fuel-moisture
-                                                    foliar-moisture
-                                                    ellipse-adjustment-factor
-                                                    cell-size
-                                                    num-rows
-                                                    num-cols
-                                                    initial-ignition-site
-                                                    nil
-                                                    0.0)}]
-         (if (and (< global-clock max-runtime)
-                  (seq ignited-cells))
-           (let [dt              (->> ignited-cells
-                                      (vals)
-                                      (apply concat)
-                                      (map :spread-rate)
-                                      (reduce max 0.0)
-                                      (/ cell-size))
-                 timestep        (if (> (+ global-clock dt) max-runtime)
-                                   (- max-runtime global-clock)
-                                   dt)
-                 ignition-events (identify-ignition-events ignited-cells timestep)]
-                                 ;; [{:cell :trajectory :fractional-distance
-                                 ;;   :flame-length :fire-line-intensity} ...]
-             (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]
-               (let [[i j] cell]
-                 (m/mset! fire-spread-matrix         i j 1.0)
-                 (m/mset! flame-length-matrix        i j flame-length)
-                 (m/mset! fire-line-intensity-matrix i j fire-line-intensity)))
-             (recur (+ global-clock timestep)
-                    (update-ignited-cells ignited-cells ignition-events fire-spread-matrix
-                                          fuel-model-matrix landfire-layers wind-speed-20ft
-                                          wind-from-direction fuel-moisture foliar-moisture
-                                          ellipse-adjustment-factor cell-size num-rows
-                                          num-cols)))
-           {:global-clock               global-clock
-            :initial-ignition-site      initial-ignition-site
-            :ignited-cells              (keys ignited-cells)
-            :fire-spread-matrix         fire-spread-matrix
-            :flame-length-matrix        flame-length-matrix
-            :fire-line-intensity-matrix fire-line-intensity-matrix}))))))
+  - initial-ignition-site: One of the following:
+     - point represented as [row col]
+     - map of ignition matrices (firespread, flame length, and fireline intensity)
+     - (randomly chosen point if omitted)"
+  (fn
+    ([constants] :add-default)
+
+    ([constants initial-ignition-site]
+     (type initial-ignition-site))))
+
+(defmethod run-fire-spread :add-default
+  [{:keys [landfire-layers] :as constants}]
+  (let [ignition-site (select-random-ignition-site (:fuel-model landfire-layers))]
+    (run-fire-spread constants ignition-site)))
+
+(defmethod run-fire-spread clojure.lang.PersistentVector
+  [{:keys [landfire-layers] :as constants} [i j :as initial-ignition-site]]
+  (let [fuel-model-matrix          (:fuel-model landfire-layers)
+        num-rows                   (m/row-count fuel-model-matrix)
+        num-cols                   (m/column-count fuel-model-matrix)
+        fire-spread-matrix         (m/zero-matrix num-rows num-cols)
+        flame-length-matrix        (m/zero-matrix num-rows num-cols)
+        fire-line-intensity-matrix (m/zero-matrix num-rows num-cols)]
+    (when (and (in-bounds? num-rows num-cols initial-ignition-site)
+               (burnable-fuel-model? (m/mget fuel-model-matrix i j))
+               (burnable-neighbors? fire-spread-matrix fuel-model-matrix
+                                    num-rows num-cols initial-ignition-site))
+      ;; initialize the ignition site
+      (m/mset! fire-spread-matrix i j 1.0)
+      (m/mset! flame-length-matrix i j 1.0)
+      (m/mset! fire-line-intensity-matrix i j 1.0)
+      (run-loop (merge
+                 constants
+                 {:num-rows              num-rows
+                  :num-cols              num-cols
+                  :initial-ignition-site initial-ignition-site
+                  :ignited-cells         {initial-ignition-site
+                                          (compute-neighborhood-fire-spread-rates!
+                                           constants
+                                           fire-spread-matrix
+                                           initial-ignition-site
+                                           nil
+                                           0.0)}})
+                fire-spread-matrix
+                flame-length-matrix
+                fire-line-intensity-matrix))))
+
+(defn- non-zero-indices
+  [m]
+  (for [[r cols] (map-indexed vector (m/non-zero-indices m))
+        c cols]
+    [r c]))
+
+(defmethod run-fire-spread clojure.lang.PersistentArrayMap
+  [{:keys [landfire-layers] :as constants} initial-ignition-raster]
+  (let [fuel-model-matrix          (:fuel-model landfire-layers)
+        fire-spread-matrix         (:initial-fire-spread initial-ignition-raster)
+        flame-length-matrix        (:initial-flame-length initial-ignition-raster)
+        fire-line-intensity-matrix (:initial-fire-line-intensity initial-ignition-raster)
+        ignited-cells              (into {}
+                                         (for [index (non-zero-indices fire-spread-matrix)
+                                               :let  [ignition-trajectories
+                                                      (compute-neighborhood-fire-spread-rates!
+                                                       constants
+                                                       fire-spread-matrix
+                                                       index
+                                                       nil
+                                                       0.0)]]
+                                           [index ignition-trajectories]))]
+    (run-loop (merge
+               constants
+               {:num-rows              (m/row-count fuel-model-matrix)
+                :num-cols              (m/column-count fuel-model-matrix)
+                :initial-ignition-site initial-ignition-raster
+                :ignited-cells         ignited-cells})
+              fire-spread-matrix
+              flame-length-matrix
+              fire-line-intensity-matrix)))
 #+end_src
 
 This concludes our description of GridFire's raster-based fire spread
@@ -2098,11 +2145,18 @@ directly from the REPL through the *run-fire-spread* function.
 However, this would require that the user had already prepared all of
 their map layers as 2D Clojure core.matrix values. In order to enable
 GridFire to easily access a wide range of raster formatted GIS layers
-directly, we make use of the open source Postgresql database and its
-PostGIS spatial extensions along with a simple client interface from
-the Clojure side. This interface is described in Section [[PostGIS
-Bridge]]. Section [[Command Line Interface]] then describes GridFire's
-command line interface along with its input configuration file format.
+directly, we have the following options:
+
+1. Postgres (an open source database) with the Postgis spatial extensions.
+This interface is described in Section [[PostGIS Bridge]].
+
+2. Magellan A Clojure library for interacting with GeoTools, an open source
+Java library that provides tools for geospatial data. This interface is
+described in Section [[Magellan]].
+
+Using one of these options along with a simple client interface in clojure
+Section [[Command Line Interface]] which describes GridFire's command line
+interface along with its input configuration file format.
 
 ** PostGIS Bridge
 
@@ -2180,6 +2234,57 @@ command line interface.
          (assoc metadata :matrix matrix))))))
 #+end_src
 
+** Magellan
+
+Reading raster layers from disk is performed by a
+single function, called *geotiff-raster-to-matrix*, which given a filepath
+to the raster file, constructs the same map of information as
+*postgis-raster-to-matrix* in the previous section.
+
+#+begin_src clojure :results silent :exports code :tangle ../src/gridfire/geotiff_bridge.clj :padline no :no-expand :comments link
+(ns gridfire.geotiff-bridge
+  (:require [clojure.core.matrix :as m]
+            [magellan.core :refer [register-new-crs-definitions-from-properties-file!
+                                   make-envelope matrix-to-raster write-raster
+                                   read-raster]]
+            [magellan.raster.inspect :as inspect]))
+
+(defn geotiff-raster-to-matrix
+  "Reads a raster from a file using the magellan.core library. Returns the
+   post-processed raster values as a Clojure matrix using the core.matrix API
+   along with all of the georeferencing information associated with this tile in a
+   hash-map with the following form:
+  {:srid 900916,
+   :upperleftx -321043.875,
+   :upperlefty -1917341.5,
+   :width 486,
+   :height 534,
+   :scalex 2000.0,
+   :scaley -2000.0,
+   :skewx 0.0,
+   :skewy 0.0,
+   :numbands 1,
+   :matrix #vectorz/matrix Large matrix with shape: [534,486]}"
+  [file-path]
+  (let [raster   (read-raster file-path)
+        r-info   (inspect/describe-raster raster)
+        matrix   (first (inspect/extract-matrix raster))
+        band     (first (:bands r-info))
+        image    (:image r-info)
+        envelope (:envelope r-info)]
+    {:srid       (:srid r-info)
+     :upperleftx (get-in image [:origin :x])
+     :upperlefty (get-in image [:origin :y])
+     :width      (:width image)
+     :height     (:height image)
+     :scalex     (get-in envelope [:x :span])
+     :scaley     (get-in envelope [:y :span])
+     :skewx      0.0 ;FIXME not used?
+     :skewy      0.0 ;FIXME not used?
+     :numbands   (get-in r-info [:image :bands])
+     :matrix     (->> matrix (m/emap #(or % -1.0)) m/matrix)}))
+
+#+end_src
 ** Command Line Interface
 
 The entire GridFire system is available for use directly from the
@@ -2235,6 +2340,8 @@ or false:
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
             [gridfire.fire-spread :refer [run-fire-spread]]
+            [gridfire.geotiff-bridge :refer [geotiff-raster-to-matrix]]
+            [gridfire.fetch :as fetch]
             [matrix-viz.core :refer [save-matrix-as-png]]
             [magellan.core :refer [register-new-crs-definitions-from-properties-file!
                                    make-envelope matrix-to-raster write-raster
@@ -2273,40 +2380,6 @@ or false:
                  (fn [matrix] (m/emap #(* % 3.28) matrix))) ; m -> ft
       (update-in [:crown-bulk-density :matrix]
                  (fn [matrix] (m/emap #(* % 0.0624) matrix))))) ; kg/m^3 -> lb/ft^3
-
-(defn geotiff-raster-to-matrix
-  "Reads a raster from a file using the magellan.core library. Returns the
-   post-processed raster values as a Clojure matrix using the core.matrix API
-   along with all of the georeferencing information associated with this tile in a
-   hash-map with the following form:
-  {:srid 900916,
-   :upperleftx -321043.875,
-   :upperlefty -1917341.5,
-   :width 486,
-   :height 534,
-   :scalex 2000.0,
-   :scaley -2000.0,
-   :skewx 0.0,
-   :skewy 0.0,
-   :numbands 1,
-   :matrix #vectorz/matrix Large matrix with shape: [534,486]}"
-  [file-path]
-  (let [raster   (read-raster file-path)
-        grid     (:grid raster)
-        r-info   (inspect/describe-raster raster)
-        matrix   (first (inspect/extract-matrix raster))
-        image    (:image r-info)]
-    {:srid       (:srid r-info)
-     :upperleftx (get-in image [:origin :x])
-     :upperlefty (get-in image [:origin :y])
-     :width      (:width image)
-     :height     (:height image)
-     :scalex     (.getScaleX (.getGridToCRS2D grid))
-     :scaley     (.getScaleY (.getGridToCRS2D grid))
-     :skewx      0.0 ;FIXME not used?
-     :skewy      0.0 ;FIXME not used?
-     :numbands   (:bands image)
-     :matrix     (->> matrix (m/emap #(or % -1.0)) m/matrix)}))
 
 (defmulti fetch-landfire-layers
   "Returns a map of LANDFIRE rasters (represented as maps) with the following units:
@@ -2426,25 +2499,29 @@ or false:
   [simulations landfire-rasters envelope cell-size ignition-row
    ignition-col max-runtime temperature relative-humidity wind-speed-20ft
    wind-from-direction foliar-moisture ellipse-adjustment-factor
-   outfile-suffix output-geotiffs? output-pngs? output-csvs?]
+   outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-rasters]
   (mapv
    (fn [i]
-     (let [equilibrium-moisture (calc-emc (relative-humidity i) (temperature i))
-           fuel-moisture        {:dead {:1hr   (+ equilibrium-moisture 0.002)
-                                        :10hr  (+ equilibrium-moisture 0.015)
-                                        :100hr (+ equilibrium-moisture 0.025)}
-                                 :live {:herbaceous (* equilibrium-moisture 2.0)
-                                        :woody      (* equilibrium-moisture 0.5)}}]
-       (if-let [fire-spread-results (run-fire-spread (max-runtime i)
-                                                     cell-size
-                                                     landfire-rasters
-                                                     (wind-speed-20ft i)
-                                                     (wind-from-direction i)
-                                                     fuel-moisture
-                                                     (* 0.01 (foliar-moisture i))
-                                                     (ellipse-adjustment-factor i)
-                                                     [(ignition-row i)
-                                                      (ignition-col i)])]
+     (let [equilibrium-moisture  (calc-emc (relative-humidity i) (temperature i))
+           fuel-moisture         {:dead {:1hr   (+ equilibrium-moisture 0.002)
+                                         :10hr  (+ equilibrium-moisture 0.015)
+                                         :100hr (+ equilibrium-moisture 0.025)}
+                                  :live {:herbaceous (* equilibrium-moisture 2.0)
+                                         :woody      (* equilibrium-moisture 0.5)}}
+           initial-ignition-site (or ignition-rasters
+                                     [(ignition-row i) (ignition-col i)])]
+       (if-let [fire-spread-results (run-fire-spread
+                                     {:max-runtime               (max-runtime i)
+                                      :cell-size                 cell-size
+                                      :landfire-layers           landfire-rasters
+                                      :wind-speed-20ft           (wind-speed-20ft i)
+                                      :wind-from-direction       (wind-from-direction i)
+                                      :fuel-moisture             fuel-moisture
+                                      :foliar-moisture           (* 0.01 (foliar-moisture i))
+                                      :ellipse-adjustment-factor (ellipse-adjustment-factor i)
+                                      :num-rows                  (m/row-count (:fuel-model landfire-rasters))
+                                      :num-cols                  (m/row-count (:fuel-model landfire-rasters))}
+                                     initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
                                  ["flame_length"        :flame-length-matrix]
@@ -2460,6 +2537,7 @@ or false:
              (merge
               {:ignition-row              (ignition-row i)
                :ignition-col              (ignition-col i)
+               :ignition-rasters           ignition-rasters
                :max-runtime               (max-runtime i)
                :temperature               (temperature i)
                :relative-humidity         (relative-humidity i)
@@ -2471,6 +2549,7 @@ or false:
          (when output-csvs?
            {:ignition-row               (ignition-row i)
             :ignition-col               (ignition-col i)
+            :ignition-rasters           ignition-rasters
             :max-runtime                (max-runtime i)
             :temperature                (temperature i)
             :relative-humidity          (relative-humidity i)
@@ -2530,6 +2609,10 @@ or false:
           landfire-rasters (into {}
                                  (map (fn [[layer info]] [layer (:matrix info)]))
                                  landfire-layers)
+          ignition-layers  (fetch/initial-ignition-layers config)
+          ignition-rasters (into {}
+                                 (map (fn [[layer-name info]] [layer-name (:matrix info)]))
+                                 ignition-layers)
           envelope         (get-envelope config landfire-layers)
           simulations      (:simulations config)
           rand-generator   (if-let [seed (:random-seed config)]
@@ -2556,11 +2639,14 @@ or false:
             (:outfile-suffix config)
             (:output-geotiffs? config)
             (:output-pngs? config)
-            (:output-csvs? config))
+            (:output-csvs? config)
+            ignition-rasters)
            (write-csv-outputs
             (:output-csvs? config)
             (str "summary_stats" (:outfile-suffix config) ".csv"))))))
 #+end_src
+
+* Configuration file
 
 The configuration file for GridFire's command line interface is a text
 file in Extensible Data Notation (EDN) format.[fn::
@@ -2574,41 +2660,172 @@ with square brackets ([]). Associative lookup tables (a.k.a. maps) are
 delimited with curly braces ({}) and are used to express key-value
 relationships.
 
-The configuration file can be broken up into 3 sections as described below:
-Section 1: Landscape data to be shared by all simulations
-Section 2: Ignition and weather data from which to build simulation inputs
-Section 3: Number of simulations and (optional) random seed parameter
-Section 4: Types and names of outputs
+The configuration file can be broken up into 5 sections as described below:
+
+** Section 1: Landscape data to be shared by all simulations
 
 Gridfire allows us to choose how we want to ingest landscape data through the
-configuration file. We can choose to get landfire layers from our postgis
-enabled database or we can read raster files from disk. This behavior is
-controlled by Section 1 of the configuration file.
+configuration file. We can choose to get landfire layers from our PostGIS
+database or we can read raster files from disk. This behavior is
+controlled as follows:
 
-Here is a complete sample configuration for using layers from our postigs enabled
-database.
+To fetch landfire layers from a PostGIS database include the following
+mappings:
+- *fetch-layer-method*: a keyword to denote which method we want to use
+- *db-spec*: a map of database connection information to our postgres database.
+- *landfire-layers*: a map of layer names to a partial sql statement.
 
-#+name: sample_postgis_config.edn
-#+begin_src clojure :results silent :exports code :tangle ../resources/sample_postgis_config.edn :padline no :no-expand :comments link
+#+begin_src clojure
+{:fetch-layer-method :postgis
+ :db-spec            {:classname   "org.postgresql.Driver"
+                      :subprotocol "postgresql"
+                      :subname     "//localhost:5432/gridfire"
+                      :user        "gridfire"}
+ :landfire-layers    {:aspect             "landfire.asp WHERE rid=100"
+                      :canopy-base-height "landfire.cbh WHERE rid=100"
+                      :canopy-cover       "landfire.cc WHERE rid=100"
+                      :canopy-height      "landfire.ch WHERE rid=100"
+                      :crown-bulk-density "landfire.cbd WHERE rid=100"
+                      :fuel-model         "landfire.fbfm40 WHERE rid=100"
+                      :slope              "landfire.slp WHERE rid=100"
+                      :elevation          "landfire.dem WHERE rid=100"}}
+#+end_src
+
+To fetch landfire layers from a PostGIS database include the following
+mappings:
+- *fetch-layer-method*: a keyword to denote which method we want to use
+- *landfire-layers*: a map of layer names to file paths
+
+#+begin_src clojure
+{:fetch-layer-method :geotiff
+ :landfire-layers    {:aspect             "test/gridfire/resources/asp.tif"
+                      :canopy-base-height "test/gridfire/resources/cbh.tif"
+                      :canopy-cover       "test/gridfire/resources/cc.tif"
+                      :canopy-height      "test/gridfire/resources/ch.tif"
+                      :crown-bulk-density "test/gridfire/resources/cbd.tif"
+                      :elevation          "test/gridfire/resources/dem.tif"
+                      :fuel-model         "test/gridfire/resources/fbfm40.tif"
+                      :slope              "test/gridfire/resources/slp.tif"}}
+#+end_src
+
+Include the following required mapping on all configurations:
+
+#+begin_src clojure
+{:srid                        "CUSTOM:900914"
+:cell-size                   98.425 ;; (feet)
+}
+#+end_src
+
+** Section 2: Ignition from which to build simulation inputs
+
+Gridfire allows us to choose how we want to initialize the ignition area.
+We can choose one of 2 options: to initialize a single point or an existing
+burn paremeter (raster).
+
+To initialize a single point include the following mappings:
+- *ignition-row*: (single, list, or range of values)
+- *ignition-col*: (single, lsit, or range of values)
+
+For this method of ignition values maybe entered in one of three ways:
+
+1. If a single value is provided, it will be kept the same for all simulations.
+2. For a list of values, the list will be randomly sampled from in each simulation.
+3. For a range of values, the range [inclusive exclusive] will be randomly sampled from in each simulation.
+
+#+begin_src clojure
+{:ignition-row [10 90]
+ :ignition-col [20 80]}
+ #+end_src
+
+To initialize an existing burn paremeter from a raster we have two options. We can
+read rasters from a PostGIS database or a raster file on disk.
+
+To initialize a burn paremeter from a raster in our PostGIS database include the
+following mappings:
+- *fetch-ignition-method*: a keyword to denote which method we want to use
+- *ignition-layers*: a mapping of layer names to a partial sql statement
+
+#+begin_src clojure
+{:fetch-ignition-method :postgis
+ :ignition-layers       {:initial-fire-spread         "ignition.scar WHERE rid=1"
+                         :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
+                         :initial-flame-length        "ignition.ifl WHERE rid=1"}}
+#+end_src
+
+
+To initialize a burn paremeter from a raster file on disk include the
+following mappings:
+- *fetch-ignition-method*: a keyword to denote which method we want to use
+- *ignition-layers*: a mapping of layer names to filepaths
+
+#+begin_src clojure
+{:fetch-ignition-method :geotiff
+ :ignition-layers       {:initial-fire-spread         "test/gridfire/resources/scar.tif"
+                         :initial-fire-line-intensity "test/gridfire/resources/ifi.tif"
+                         :initial-flame-length        "test/gridfire/resources/ifl.tif"}}
+#+end_src
+** Section 3: Weather data from which to build simulation inputs
+
+For all options in this section, you may enter values in one of the three ways:
+single, list, or range of values.
+
+ #+begin_src clojure
+{:max-runtime               60             ;; (minutes)
+ :temperature               (50 65 80)     ;; (degrees Fahrenheit)
+ :relative-humidity         (1 10 20)      ;; (%)
+ :wind-speed-20ft           (10 15 20)     ;; (miles/hour)
+ :wind-from-direction       (0 90 180 270) ;; (degrees clockwise from north)
+ :foliar-moisture           90             ;; (%)
+ :ellipse-adjustment-factor 1.0            ;; (< 1.0 = more circular, > 1.0 = more elliptical)
+ }
+ #+end_src
+
+** Section 4: Number of simulations and (optional) random seed parameter
+
+#+begin_src clojure
+{:simulations 10
+ :random-seed  1234567890 ;; long value (optional)
+}
+#+end_src
+
+** Section 5: Types and names of outputs
+
+#+begin_src clojure
+{:outfile-suffix          "_tile_100"
+ :output-landfire-inputs? true
+ :output-geotiffs?        true
+ :output-pngs?            true
+ :output-csvs?            true}
+#+end_src
+
+Here is a complete sample configuration for using landfire layers from our postigs enabled
+database and initializing burn points from a range of values.
+
+ #+name: sample_postgis_config.edn
+ #+begin_src clojure :results silent :exports code :tangle ../resources/sample_postgis_config.edn :padline no :no-expand :comments link
 {
  ;; Section 1: Landscape data to be shared by all simulations
- :db-spec                     {:classname   "org.postgresql.Driver"
-                               :subprotocol "postgresql"
-                               :subname     "//localhost:5432/gridfire"
-                               :user        "gridfire"}
- :landfire-layers             {:aspect             "landfire.asp WHERE rid=100"
-                               :canopy-base-height "landfire.cbh WHERE rid=100"
-                               :canopy-cover       "landfire.cc WHERE rid=100"
-                               :canopy-height      "landfire.ch WHERE rid=100"
-                               :crown-bulk-density "landfire.cbd WHERE rid=100"
-                               :fuel-model         "landfire.fbfm40 WHERE rid=100"
-                               :slope              "landfire.slp WHERE rid=100"
-                               :elevation          "landfire.dem WHERE rid=100"}
- :srid                        "CUSTOM:900914"
- :cell-size                   98.425 ;; (feet)
+ :fetch-layer-method        :postgis
+ :db-spec                   {:classname   "org.postgresql.Driver"
+                             :subprotocol "postgresql"
+                             :subname     "//localhost:5432/gridfire"
+                             :user        "gridfire"}
+ :landfire-layers           {:aspect             "landfire.asp WHERE rid=100"
+                             :canopy-base-height "landfire.cbh WHERE rid=100"
+                             :canopy-cover       "landfire.cc WHERE rid=100"
+                             :canopy-height      "landfire.ch WHERE rid=100"
+                             :crown-bulk-density "landfire.cbd WHERE rid=100"
+                             :fuel-model         "landfire.fbfm40 WHERE rid=100"
+                             :slope              "landfire.slp WHERE rid=100"
+                             :elevation          "landfire.dem WHERE rid=100"}
+ :srid                      "CUSTOM:900914"
+ :cell-size                 98.425         ;; (feet)
 
  ;; Section 2: Ignition and weather data from which to build simulation inputs
- ;;
+ :ignition-row              [10 90]
+ :ignition-col              [20 80]
+
+ ;; Section 3: Weather data from which to build simulation inputs
  ;; For all options in this section, you may enter values in one of three ways:
  ;;   1. Single Value: 25
  ;;   2. List of Values: (2 17 9)
@@ -2617,49 +2834,53 @@ database.
  ;; If a single value is provided, it will be kept the same for all simulations.
  ;; For a list of values, the list will be randomly sampled from in each simulation.
  ;; For a range of values, the range [inclusive exclusive] will be randomly sampled from in each simulation.
- :ignition-row                [10 90]
- :ignition-col                [20 80]
- :max-runtime                 60 ;; (minutes)
- :temperature                 (50 65 80) ;; (degrees Fahrenheit)
- :relative-humidity           (1 10 20) ;; (%)
- :wind-speed-20ft             (10 15 20) ;; (miles/hour)
- :wind-from-direction         (0 90 180 270) ;; (degrees clockwise from north)
- :foliar-moisture             90 ;; (%)
- :ellipse-adjustment-factor   1.0 ;; (< 1.0 = more circular, > 1.0 = more elliptical)
+ :max-runtime               60             ;; (minutes)
+ :temperature               (50 65 80)     ;; (degrees Fahrenheit)
+ :relative-humidity         (1 10 20)      ;; (%)
+ :wind-speed-20ft           (10 15 20)     ;; (miles/hour)
+ :wind-from-direction       (0 90 180 270) ;; (degrees clockwise from north)
+ :foliar-moisture           90             ;; (%)
+ :ellipse-adjustment-factor 1.0            ;; (< 1.0 = more circular, > 1.0 = more elliptical)
 
- ;; Section 3: Number of simulations and (optional) random seed parameter
- :simulations                 10
- :random-seed                 1234567890 ;; long value (optional)
+ ;; Section 4: Number of simulations and (optional) random seed parameter
+ :simulations               10
+ :random-seed               1234567890     ;; long value (optional)
 
- ;; Section 4: Types and names of outputs
- :outfile-suffix              "_tile_100"
- :output-landfire-inputs?     true
- :output-geotiffs?            true
- :output-pngs?                true
- :output-csvs?                true
- :fetch-layer-method          :postgis
-}
-#+end_src
+ ;; Section 5: Types and names of outputs
+ :outfile-suffix            "_tile_100"
+ :output-landfire-inputs?   true
+ :output-geotiffs?          true
+ :output-pngs?              true
+ :output-csvs?              true
+ }
+ #+end_src
 
-Here is a complete sample config for using layers from disk.
+Here is a complete sample config for reading landfire-layers from disk and
+initializing a burn paremeter from reading a raster file from disk.
 
-#+name: sample_geotiff_config.edn
-#+begin_src clojure :results silent :exports code :tangle ../resources/sample_geotiff_config.edn :padline no :no-expand :comments link
+ #+name: sample_geotiff_config.edn
+ #+begin_src clojure :results silent :exports code :tangle ../resources/sample_geotiff_config.edn :padline no :no-expand :comments link
 {
  ;; Section 1: Landscape data to be shared by all simulations
- :landfire-layers             {:aspect             "test/gridfire/resources/asp.tif"
-                               :canopy-base-height "test/gridfire/resources/cbh.tif"
-                               :canopy-cover       "test/gridfire/resources/cc.tif"
-                               :canopy-height      "test/gridfire/resources/ch.tif"
-                               :crown-bulk-density "test/gridfire/resources/cbd.tif"
-                               :elevation          "test/gridfire/resources/dem.tif"
-                               :fuel-model         "test/gridfire/resources/fbfm40.tif"
-                               :slope              "test/gridfire/resources/slp.tif"}
- :srid                        "CUSTOM:900914"
- :cell-size                   98.425 ;; (feet)
+ :fetch-layer-method        :geotiff
+ :landfire-layers           {:aspect             "test/gridfire/resources/asp.tif"
+                             :canopy-base-height "test/gridfire/resources/cbh.tif"
+                             :canopy-cover       "test/gridfire/resources/cc.tif"
+                             :canopy-height      "test/gridfire/resources/ch.tif"
+                             :crown-bulk-density "test/gridfire/resources/cbd.tif"
+                             :elevation          "test/gridfire/resources/dem.tif"
+                             :fuel-model         "test/gridfire/resources/fbfm40.tif"
+                             :slope              "test/gridfire/resources/slp.tif"}
+ :srid                      "CUSTOM:900914"
+ :cell-size                 98.425         ;; (feet)
 
- ;; Section 2: Ignition and weather data from which to build simulation inputs
- ;;
+ ;; Section 2: Ignition from which to build simulation inputs
+ :fetch-ignition-method     :geotiff
+ :ignition-layers           {:initial-fire-spread         "test/gridfire/resources/scar.tif"
+                             :initial-fire-line-intensity "test/gridfire/resources/ifi.tif"
+                             :initial-flame-length        "test/gridfire/resources/ifl.tif"}
+
+ ;; Section 3: Weather data from which to build simulation inputs
  ;; For all options in this section, you may enter values in one of three ways:
  ;;   1. Single Value: 25
  ;;   2. List of Values: (2 17 9)
@@ -2668,34 +2889,31 @@ Here is a complete sample config for using layers from disk.
  ;; If a single value is provided, it will be kept the same for all simulations.
  ;; For a list of values, the list will be randomly sampled from in each simulation.
  ;; For a range of values, the range [inclusive exclusive] will be randomly sampled from in each simulation.
- :ignition-row                [10 90]
- :ignition-col                [20 80]
- :max-runtime                 60 ;; (minutes)
- :temperature                 (50 65 80) ;; (degrees Fahrenheit)
- :relative-humidity           (1 10 20) ;; (%)
- :wind-speed-20ft             (10 15 20) ;; (miles/hour)
- :wind-from-direction         (0 90 180 270) ;; (degrees clockwise from north)
- :foliar-moisture             90 ;; (%)
- :ellipse-adjustment-factor   1.0 ;; (< 1.0 = more circular, > 1.0 = more elliptical)
+ :max-runtime               60             ;; (minutes)
+ :temperature               (50 65 80)     ;; (degrees Fahrenheit)
+ :relative-humidity         (1 10 20)      ;; (%)
+ :wind-speed-20ft           (10 15 20)     ;; (miles/hour)
+ :wind-from-direction       (0 90 180 270) ;; (degrees clockwise from north)
+ :foliar-moisture           90             ;; (%)
+ :ellipse-adjustment-factor 1.0            ;; (< 1.0 = more circular, > 1.0 = more elliptical)
 
  ;; Section 3: Number of simulations and (optional) random seed parameter
- :simulations                 10
- :random-seed                 1234567890 ;; long value (optional)
+ :simulations               10
+ :random-seed               1234567890     ;; long value (optional)
 
  ;; Section 4: Types and names of outputs
- :outfile-suffix              "_tile_100"
- :output-landfire-inputs?     true
- :output-geotiffs?            true
- :output-pngs?                true
- :output-csvs?                true
- :fetch-layer-method          :geotiff
-}
-#+end_src
+ :outfile-suffix            "_tile_100"
+ :output-landfire-inputs?   true
+ :output-geotiffs?          true
+ :output-pngs?              true
+ :output-csvs?              true
+ }
+ #+end_src
 
 This concludes our discussion of GridFire's command line interface.
 
-#+LATEX: \bibliographystyle{plainnat}
-#+LATEX: \bibliography{GridFire}
+ #+LATEX: \bibliographystyle{plainnat}
+ #+LATEX: \bibliography{GridFire}
 
 * Monte Carlo Simulation :noexport:
 

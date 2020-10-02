@@ -362,7 +362,6 @@
                                                        nil
                                                        0.0)]]
                                            [index ignition-trajectories]))]
-    (clojure.pprint/pprint fire-spread-matrix)
     (run-loop (merge
                constants
                {:num-rows              (m/row-count fuel-model-matrix)
