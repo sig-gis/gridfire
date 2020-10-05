@@ -295,7 +295,9 @@
   - initial-ignition-site: One of the following:
      - point represented as [row col]
      - map of ignition matrices (firespread, flame length, and fireline intensity)
-     - (randomly chosen point if omitted)"
+     - (randomly chosen point if omitted)
+  -num-rows: integer
+  -num-cols: integer"
   (fn
     ([constants] :add-default)
 
@@ -308,10 +310,8 @@
     (run-fire-spread constants ignition-site)))
 
 (defmethod run-fire-spread clojure.lang.PersistentVector
-  [{:keys [landfire-layers] :as constants} [i j :as initial-ignition-site]]
+  [{:keys [landfire-layers num-rows num-cols] :as constants} [i j :as initial-ignition-site]]
   (let [fuel-model-matrix          (:fuel-model landfire-layers)
-        num-rows                   (m/row-count fuel-model-matrix)
-        num-cols                   (m/column-count fuel-model-matrix)
         fire-spread-matrix         (m/zero-matrix num-rows num-cols)
         flame-length-matrix        (m/zero-matrix num-rows num-cols)
         fire-line-intensity-matrix (m/zero-matrix num-rows num-cols)]
@@ -325,9 +325,7 @@
       (m/mset! fire-line-intensity-matrix i j 1.0)
       (run-loop (merge
                  constants
-                 {:num-rows              num-rows
-                  :num-cols              num-cols
-                  :initial-ignition-site initial-ignition-site
+                 {:initial-ignition-site initial-ignition-site
                   :ignited-cells         {initial-ignition-site
                                           (compute-neighborhood-fire-spread-rates!
                                            constants
