@@ -8,7 +8,7 @@
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
             [gridfire.fire-spread :refer [run-fire-spread]]
-            [gridfire.geotiff-bridge :refer [geotiff-raster-to-matrix]]
+            [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
             [gridfire.fetch :as fetch]
             [matrix-viz.core :refer [save-matrix-as-png]]
             [magellan.core :refer [register-new-crs-definitions-from-properties-file!
