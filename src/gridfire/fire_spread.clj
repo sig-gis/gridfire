@@ -140,16 +140,15 @@
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
   :terrain-distance ft, :spread-rate ft/min, :fire-line-intensity Btu/ft/s, :flame-length ft,
   :fractional-distance [0-1]}, one for each cell adjacent to here."
-  [{:keys
-    [landfire-layers
-     wind-speed-20ft
-     wind-from-direction
-     fuel-moisture
-     foliar-moisture
-     ellipse-adjustment-factor
-     cell-size
-     num-rows
-     num-cols] :as params}
+  [{:keys [landfire-layers
+           wind-speed-20ft
+           wind-from-direction
+           fuel-moisture
+           foliar-moisture
+           ellipse-adjustment-factor
+           cell-size
+           num-rows
+           num-cols]}
    fire-spread-matrix
    [i j :as here]
    overflow-trajectory
@@ -340,16 +339,14 @@
                 flame-length-matrix
                 fire-line-intensity-matrix))))
 
-(defn- non-zero-indices
-  [m]
+(defn- non-zero-indices [m]
   (for [[r cols] (map-indexed vector (m/non-zero-indices m))
         c cols]
     [r c]))
 
 (defmethod run-fire-spread clojure.lang.PersistentArrayMap
   [{:keys [landfire-layers] :as constants} initial-ignition-raster]
-  (let [fuel-model-matrix          (:fuel-model landfire-layers)
-        fire-spread-matrix         (:initial-fire-spread initial-ignition-raster)
+  (let [fire-spread-matrix         (:initial-fire-spread initial-ignition-raster)
         flame-length-matrix        (:initial-flame-length initial-ignition-raster)
         fire-line-intensity-matrix (:initial-fire-line-intensity initial-ignition-raster)
         ignited-cells              (into {}
@@ -364,9 +361,7 @@
                                            [index ignition-trajectories]))]
     (run-loop (merge
                constants
-               {:num-rows              (m/row-count fuel-model-matrix)
-                :num-cols              (m/column-count fuel-model-matrix)
-                :initial-ignition-site initial-ignition-raster
+               {:initial-ignition-site initial-ignition-raster
                 :ignited-cells         ignited-cells})
               fire-spread-matrix
               flame-length-matrix

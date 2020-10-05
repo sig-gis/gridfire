@@ -1,8 +1,8 @@
 (ns gridfire.ignition-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [gridfire.fetch :as fetch]
-            [gridfire.cli :as gf])
-  (:import (java.util Random)))
+  (:require [clojure.test :refer [deftest is testing]]
+            [gridfire.cli :as gf]
+            [gridfire.fetch :as fetch])
+  (:import java.util.Random))
 
 ;;-----------------------------------------------------------------------------
 ;; Config
