@@ -293,7 +293,6 @@
           rand-generator   (if-let [seed (:random-seed config)]
                              (Random. seed)
                              (Random.))]
-      (prn envelope)
       (when (:output-landfire-inputs? config)
         (doseq [[layer matrix] landfire-rasters]
           (-> (matrix-to-raster (name layer) matrix envelope)

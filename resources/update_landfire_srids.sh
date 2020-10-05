@@ -8,6 +8,6 @@ SRID=$3
 for LAYER in asp cbd cbh cc ch dem fbfm13 fbfm40 slp
 do
     psql -h localhost -U $DATABASE -c \
-         "SELECT UpdateRasterSRID('$SCHEMA'::name,'$LAYER'::name,'rast'::name,$SRID);" &
+         "SELECT UpdateRasterSRID('$SCHEMA'::name,'$LAYER'::name,'rast'::name,$SRID);"
 done
 # Importing Rasters into the Database:6 ends here
