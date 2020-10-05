@@ -7,6 +7,7 @@
         org.postgresql/postgresql           {:mvn/version "42.2.16"}
         net.mikera/core.matrix              {:mvn/version "0.62.0"}
         net.mikera/vectorz-clj              {:mvn/version "0.48.0"}
+                                            ;;TODO Point to new magellan once it is deployed
         sig-gis/magellan                    {:local/root "../magellan/target/magellan-20200909.105353.jar"}
         org.clojars.lambdatronic/matrix-viz {:mvn/version "0.1.7"}
         cider/cider-nrepl                   {:mvn/version "0.25.3"}}
