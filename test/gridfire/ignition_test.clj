@@ -138,7 +138,7 @@
 
 (deftest postgis-ignition-test
   (testing "Running simulation with ignition layers read from geotiff files"
-    (let [geotiff-config (merge test-config-base
+    (let [postgis-config (merge test-config-base
                                 {:fetch-ignition-method
                                  :postgis
 
@@ -146,5 +146,5 @@
                                  {:initial-fire-spread         "ignition.scar WHERE rid=1"
                                   :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
                                   :initial-flame-length        "ignition.ifl WHERE rid=1"}})
-          results (run-simulation geotiff-config)]
+          results (run-simulation postgis-config)]
       (is (every? some? results)))))
