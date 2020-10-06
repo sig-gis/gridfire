@@ -219,7 +219,9 @@
        (into [])))
 
 (defn update-ignited-cells
-  [{:keys [ignited-cells ignition-events landfire-layers num-rows num-cols] :as constants}
+  [{:keys [landfire-layers num-rows num-cols] :as constants}
+   ignited-cells
+   ignition-events
    fire-spread-matrix]
   (let [newly-ignited-cells (into #{} (map :cell) ignition-events)
         fuel-model-matrix (:fuel-model landfire-layers)]
@@ -240,7 +242,8 @@
                     (- fractional-distance 1.0))])))))
 
 (defn run-loop
-  [{:keys [max-runtime cell-size global-clock ignited-cells initial-ignition-site] :as constants}
+  [{:keys [max-runtime cell-size initial-ignition-site] :as constants}
+   ignited-cells
    fire-spread-matrix
    flame-length-matrix
    fire-line-intensity-matrix]
@@ -266,7 +269,7 @@
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)))
         (recur (+ global-clock timestep)
-               (update-ignited-cells constants fire-spread-matrix)))
+               (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix)))
       {:global-clock               global-clock
        :initial-ignition-site      initial-ignition-site
        :ignited-cells              (keys ignited-cells)
@@ -323,19 +326,20 @@
       (m/mset! fire-spread-matrix i j 1.0)
       (m/mset! flame-length-matrix i j 1.0)
       (m/mset! fire-line-intensity-matrix i j 1.0)
-      (run-loop (merge
-                 constants
-                 {:initial-ignition-site initial-ignition-site
-                  :ignited-cells         {initial-ignition-site
-                                          (compute-neighborhood-fire-spread-rates!
-                                           constants
-                                           fire-spread-matrix
-                                           initial-ignition-site
-                                           nil
-                                           0.0)}})
-                fire-spread-matrix
-                flame-length-matrix
-                fire-line-intensity-matrix))))
+      (let [ignited-cells {initial-ignition-site
+                           (compute-neighborhood-fire-spread-rates!
+                            constants
+                            fire-spread-matrix
+                            initial-ignition-site
+                            nil
+                            0.0)}]
+       (run-loop (merge
+                  constants
+                  {:initial-ignition-site initial-ignition-site})
+                 ignited-cells
+                 fire-spread-matrix
+                 flame-length-matrix
+                 fire-line-intensity-matrix)))))
 
 (defn- non-zero-indices [m]
   (for [[r cols] (map-indexed vector (m/non-zero-indices m))
@@ -359,8 +363,8 @@
                                            [index ignition-trajectories]))]
     (run-loop (merge
                constants
-               {:initial-ignition-site initial-ignition-raster
-                :ignited-cells         ignited-cells})
+               {:initial-ignition-site initial-ignition-raster})
+              ignited-cells
               fire-spread-matrix
               flame-length-matrix
               fire-line-intensity-matrix)))
