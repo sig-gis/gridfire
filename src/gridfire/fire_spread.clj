@@ -299,8 +299,8 @@
      - point represented as [row col]
      - map of ignition matrices (firespread, flame length, and fireline intensity)
      - (randomly chosen point if omitted)
-  -num-rows: integer
-  -num-cols: integer"
+  - num-rows: integer
+  - num-cols: integer"
   (fn
     ([constants] :add-default)
 
