@@ -23,8 +23,8 @@
   (reduce
    (fn [amap ignition-name]
      (let [table  (ignition-layers ignition-name)
-           raster (postgis-raster-to-matrix db-spec table)]
-       (assoc amap ignition-name raster)))
+           matrix (postgis-raster-to-matrix db-spec table)]
+       (assoc amap ignition-name matrix)))
    {}
    ignition-names))
 
@@ -33,8 +33,8 @@
   (reduce
    (fn [amap ignition-name]
      (let [geotiff (ignition-layers ignition-name)
-           raster  (geotiff-raster-to-matrix geotiff)]
-       (assoc amap ignition-name raster)))
+           matrix  (geotiff-raster-to-matrix geotiff)]
+       (assoc amap ignition-name matrix)))
    {}
    ignition-names))
 
