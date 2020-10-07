@@ -1981,7 +1981,9 @@ pseudo-code lays out the steps taken in this procedure:
        (into [])))
 
 (defn update-ignited-cells
-  [{:keys [ignited-cells ignition-events landfire-layers num-rows num-cols] :as constants}
+  [{:keys [landfire-layers num-rows num-cols] :as constants}
+   ignited-cells
+   ignition-events
    fire-spread-matrix]
   (let [newly-ignited-cells (into #{} (map :cell) ignition-events)
         fuel-model-matrix (:fuel-model landfire-layers)]
@@ -2002,7 +2004,8 @@ pseudo-code lays out the steps taken in this procedure:
                     (- fractional-distance 1.0))])))))
 
 (defn run-loop
-  [{:keys [max-runtime cell-size global-clock ignited-cells initial-ignition-site] :as constants}
+  [{:keys [max-runtime cell-size initial-ignition-site] :as constants}
+   ignited-cells
    fire-spread-matrix
    flame-length-matrix
    fire-line-intensity-matrix]
@@ -2028,7 +2031,7 @@ pseudo-code lays out the steps taken in this procedure:
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)))
         (recur (+ global-clock timestep)
-               (update-ignited-cells constants fire-spread-matrix)))
+               (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix)))
       {:global-clock               global-clock
        :initial-ignition-site      initial-ignition-site
        :ignited-cells              (keys ignited-cells)
@@ -2041,14 +2044,14 @@ pseudo-code lays out the steps taken in this procedure:
   - max-runtime: double (minutes)
   - cell-size: double (feet)
   - landfire-layers: Consisting of these matrices
-    - elevation-matrix: core.matrix 2D double array (feet)
-    - slope-matrix: core.matrix 2D double array (vertical feet/horizontal feet)
-    - aspect-matrix: core.matrix 2D double array (degrees clockwise from north)
-    - fuel-model-matrix: core.matrix 2D double array (fuel model numbers 1-256)
-    - canopy-height-matrix: core.matrix 2D double array (feet)
-    - canopy-base-height-matrix: core.matrix 2D double array (feet)
-    - crown-bulk-density-matrix: core.matrix 2D double array (lb/ft^3)
-    - canopy-cover-matrix: core.matrix 2D double array (0-100)
+    - elevation: core.matrix 2D double array (feet)
+    - slope: core.matrix 2D double array (vertical feet/horizontal feet)
+    - aspect: core.matrix 2D double array (degrees clockwise from north)
+    - fuel-model: core.matrix 2D double array (fuel model numbers 1-256)
+    - canopy-height: core.matrix 2D double array (feet)
+    - canopy-base-height: core.matrix 2D double array (feet)
+    - crown-bulk-density: core.matrix 2D double array (lb/ft^3)
+    - canopy-cover: core.matrix 2D double array (0-100)
   - wind-speed-20ft: double (miles/hour)
   - wind-from-direction: double (degrees clockwise from north)
   - fuel-moisture: doubles (%){:dead {:1hr :10hr :100hr} :live {:herbaceous :woody}}
@@ -2057,7 +2060,9 @@ pseudo-code lays out the steps taken in this procedure:
   - initial-ignition-site: One of the following:
      - point represented as [row col]
      - map of ignition matrices (firespread, flame length, and fireline intensity)
-     - (randomly chosen point if omitted)"
+     - (randomly chosen point if omitted)
+  -num-rows: integer
+  -num-cols: integer"
   (fn
     ([constants] :add-default)
 
@@ -2070,10 +2075,8 @@ pseudo-code lays out the steps taken in this procedure:
     (run-fire-spread constants ignition-site)))
 
 (defmethod run-fire-spread clojure.lang.PersistentVector
-  [{:keys [landfire-layers] :as constants} [i j :as initial-ignition-site]]
+  [{:keys [landfire-layers num-rows num-cols] :as constants} [i j :as initial-ignition-site]]
   (let [fuel-model-matrix          (:fuel-model landfire-layers)
-        num-rows                   (m/row-count fuel-model-matrix)
-        num-cols                   (m/column-count fuel-model-matrix)
         fire-spread-matrix         (m/zero-matrix num-rows num-cols)
         flame-length-matrix        (m/zero-matrix num-rows num-cols)
         fire-line-intensity-matrix (m/zero-matrix num-rows num-cols)]
@@ -2085,21 +2088,20 @@ pseudo-code lays out the steps taken in this procedure:
       (m/mset! fire-spread-matrix i j 1.0)
       (m/mset! flame-length-matrix i j 1.0)
       (m/mset! fire-line-intensity-matrix i j 1.0)
-      (run-loop (merge
-                 constants
-                 {:num-rows              num-rows
-                  :num-cols              num-cols
-                  :initial-ignition-site initial-ignition-site
-                  :ignited-cells         {initial-ignition-site
-                                          (compute-neighborhood-fire-spread-rates!
-                                           constants
-                                           fire-spread-matrix
-                                           initial-ignition-site
-                                           nil
-                                           0.0)}})
-                fire-spread-matrix
-                flame-length-matrix
-                fire-line-intensity-matrix))))
+      (let [ignited-cells {initial-ignition-site
+                           (compute-neighborhood-fire-spread-rates!
+                            constants
+                            fire-spread-matrix
+                            initial-ignition-site
+                            nil
+                            0.0)}]
+       (run-loop (merge
+                  constants
+                  {:initial-ignition-site initial-ignition-site})
+                 ignited-cells
+                 fire-spread-matrix
+                 flame-length-matrix
+                 fire-line-intensity-matrix)))))
 
 (defn- non-zero-indices [m]
   (for [[r cols] (map-indexed vector (m/non-zero-indices m))
@@ -2123,8 +2125,8 @@ pseudo-code lays out the steps taken in this procedure:
                                            [index ignition-trajectories]))]
     (run-loop (merge
                constants
-               {:initial-ignition-site initial-ignition-raster
-                :ignited-cells         ignited-cells})
+               {:initial-ignition-site initial-ignition-raster})
+              ignited-cells
               fire-spread-matrix
               flame-length-matrix
               fire-line-intensity-matrix)))
