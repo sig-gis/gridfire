@@ -269,6 +269,17 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
+(defn get-weather [config name]
+  (let [val (name config)]
+    (if (map? val)
+      (let [raster (fetch/weather name)]
+        (repeat n raster))
+      (let [rand-generator (if-let [seed (:random-seed config)]
+                               (Random. seed)
+                               (Random.))
+            simulations    (:simulations config)]
+        (draw-samples rand-generator simulations val)))))
+
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
@@ -295,11 +306,11 @@
             (draw-samples rand-generator simulations (:ignition-row config))
             (draw-samples rand-generator simulations (:ignition-col config))
             (draw-samples rand-generator simulations (:max-runtime config))
-            (draw-samples rand-generator simulations (:temperature config))
-            (draw-samples rand-generator simulations (:relative-humidity config))
-            (draw-samples rand-generator simulations (:wind-speed-20ft config))
-            (draw-samples rand-generator simulations (:wind-from-direction config))
-            (draw-samples rand-generator simulations (:foliar-moisture config))
+            (get-weather config :temperature)
+            (get-weather config :relative-humidity)
+            (get-weather config :wind-speed-20ft)
+            (get-weather config :wind-from-direction)
+            (get-weather config :foliar-moisture)
             (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
             (:outfile-suffix config)
             (:output-geotiffs? config)
