@@ -61,7 +61,7 @@
                              m/matrix))]
          (assoc metadata :matrix matrix))))))
 
-(defn extract-matrices [result]
+(defn extract-matrix [result]
   (->> result
        :matrix
        .getValue
@@ -97,7 +97,7 @@
      (jdbc/with-db-transaction [conn db-spec]
        (let [metadata (first (jdbc/query conn [meta-query]))
              matrix   (when-let [results (seq (jdbc/query conn [data-query]))]
-                        (m/matrix (mapv extract-matrices results)))]
+                        (m/matrix (mapv extract-matrix results)))]
          (assoc metadata :matrix matrix)))))
 
   ([db-spec table-name resolution threshold]
@@ -118,6 +118,6 @@
      (jdbc/with-db-transaction [conn db-spec]
        (let [metadata (first (jdbc/query conn [meta-query]))
              matrix   (when-let [results (seq (jdbc/query conn [data-query]))]
-                        (m/matrix (mapv extract-matrices results)))]
+                        (m/matrix (mapv extract-matrix results)))]
          (assoc metadata :matrix matrix))))))
 ;; postgis-bridge ends here
