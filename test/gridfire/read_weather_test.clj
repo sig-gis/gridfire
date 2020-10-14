@@ -1,12 +1,11 @@
 (ns gridfire.read-weather-test
-  (:require
-   [clojure.test :refer [deftest is]]
-   [mikera.vectorz.core :as v]
-   [clojure.core.matrix :as m]
-   [gridfire.cli :as cli]
-   [gridfire.fetch :as fetch]
-   [clojure.java.jdbc :as jdbc])
-  (:import (java.util Random)))
+  (:require [clojure.core.matrix :as m]
+            [clojure.java.jdbc :as jdbc]
+            [clojure.test :refer [deftest is]]
+            [gridfire.cli :as cli]
+            [gridfire.fetch :as fetch]
+            [mikera.vectorz.core :as v])
+  (:import java.util.Random))
 
 ;;-----------------------------------------------------------------------------
 ;; Config
