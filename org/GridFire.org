@@ -2879,7 +2879,7 @@ following mappings:
 #+end_src
 
 Gridfire makes use of clojure's multimethods to dispatch control to
-different handlers for fetching ignition layers. The dispatch depends 
+different handlers for fetching ignition layers. The dispatch depends
 on what is in the config file. Here's the namespace that implements
 this functionality.
 #+begin_src clojure :results silent :exports code :tangle ../src/gridfire/fetch.clj :padline no :no-expand :comments link
@@ -2959,7 +2959,7 @@ this functionality.
   (:matrix (geotiff-raster-to-matrix-multiband foliar-moisture)))
 #+end_src
 ** Section 3: Weather data from which to build simulation inputs
-   
+
 For all options in this section, you may enter values in one of the three ways:
 single, list, or range of values.
 
@@ -2973,10 +2973,10 @@ single, list, or range of values.
  :ellipse-adjustment-factor 1.0            ;; (< 1.0 = more circular, > 1.0 = more elliptical)
  }
  #+end_src
- 
+
 Temperature, relative humidity, wind speed, and wind direction accepts an
 additional type of input. Gridfire allows us to use weather data from rasters.
-To use weather data from raster we have two options. We can read rasters from a 
+To use weather data from raster we have two options. We can read rasters from a
 PostGIS database or a raster file on disk.
 
 To use weather raster in our PostGIS database include the
