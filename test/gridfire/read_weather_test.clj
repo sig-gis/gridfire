@@ -54,8 +54,7 @@
     (is (= geotiff-results postgis-results))
 
     (let [numbands (count (:bands (magellan.core/read-raster (in-file-path geotiff-file))))]
-      (is (= numbands (m/dimension-count geotiff-results 0))
-          "should have "))
+      (is (= numbands (m/dimension-count geotiff-results 0))))
 
     (let [results  (jdbc/with-db-connection [conn (:db-spec test-config-base)]
                      (jdbc/query conn [(str "SELECT (ST_Metadata(rast)).numbands FROM " postgis-table)]))
@@ -197,7 +196,6 @@
                                :simulations 10})
         rand-generator (Random. (:random-seed config))
         results        (cli/get-weather config rand-generator :temperature)]
-
 
     (is (vector results))
 
