@@ -287,7 +287,7 @@
     (let [config           (edn/read-string (slurp config-file))
           landfire-layers  (fetch-landfire-layers config)
           landfire-rasters (into {}
-                                 (map (fn [[layer info]] [layer (first (:matrix info))]))
+                                 (map (fn [[layer info]] [layer (:matrix info)]))
                                  landfire-layers)
           ignition-raster  (fetch/initial-ignition-layers config)
           envelope         (get-envelope config landfire-layers)
@@ -311,7 +311,7 @@
             (get-weather config rand-generator :relative-humidity)
             (get-weather config rand-generator :wind-speed-20ft)
             (get-weather config rand-generator :wind-from-direction)
-            (get-weather config rand-generator :foliar-moisture)
+            (draw-samples rand-generator simulations (:foliar-moisture config))
             (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
             (:outfile-suffix config)
             (:output-geotiffs? config)
