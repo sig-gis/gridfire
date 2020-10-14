@@ -63,12 +63,4 @@
 (defmethod weather :geotiff-wind-from-direction
   [{:keys [wind-from-direction] :as config} type]
   (:matrix (geotiff-raster-to-matrix-multiband wind-from-direction)))
-
-(defmethod weather :postgis-foliar-moisture
-  [{:keys [foliar-moisture db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec foliar-moisture)))
-
-(defmethod weather :geotiff-foliar-moisture
-  [{:keys [foliar-moisture] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband foliar-moisture)))
 ;; Section 2: Ignition from which to build simulation inputs:4 ends here
