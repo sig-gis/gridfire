@@ -9,7 +9,8 @@
         net.mikera/vectorz-clj              {:mvn/version "0.48.0"}
                                             ;;TODO Point to new magellan once it is deployed
         sig-gis/magellan                    {:local/root "../magellan/target/magellan-20200909.105353.jar"}
-        org.clojars.lambdatronic/matrix-viz {:mvn/version "0.1.7"}}
+        org.clojars.lambdatronic/matrix-viz {:mvn/version "0.1.7"}
+        cider/cider-nrepl                   {:mvn/version "0.25.3"}}
 
  :mvn/repos {"osgeo" {:url "https://repo.osgeo.org/repository/release/"}}
 
