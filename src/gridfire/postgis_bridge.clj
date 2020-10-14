@@ -67,8 +67,8 @@
        .getValue
        read-string
        second
-       (clojure.string/replace #"\{" "[")
-       (clojure.string/replace #"\}" "]")
+       (#(clojure.string/replace % #"\{" "["))
+       (#(clojure.string/replace % #"\}" "]"))
        read-string
        (m/emap #(or % -1.0))
        m/matrix))
