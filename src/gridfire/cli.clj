@@ -5,6 +5,7 @@
             [clojure.java.io :as io]
             [clojure.data.csv :as csv]
             [clojure.core.matrix :as m]
+            [clojure.string :as s]
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
             [gridfire.fire-spread :refer [run-fire-spread]]
@@ -286,7 +287,7 @@
     (let [config           (edn/read-string (slurp config-file))
           landfire-layers  (fetch-landfire-layers config)
           landfire-rasters (into {}
-                                 (map (fn [[layer info]] [layer (:matrix info)]))
+                                 (map (fn [[layer info]] [layer (first (:matrix info))]))
                                  landfire-layers)
           ignition-raster  (fetch/initial-ignition-layers config)
           envelope         (get-envelope config landfire-layers)
@@ -306,11 +307,11 @@
             (draw-samples rand-generator simulations (:ignition-row config))
             (draw-samples rand-generator simulations (:ignition-col config))
             (draw-samples rand-generator simulations (:max-runtime config))
-            (get-weather config :temperature)
-            (get-weather config :relative-humidity)
-            (get-weather config :wind-speed-20ft)
-            (get-weather config :wind-from-direction)
-            (get-weather config :foliar-moisture)
+            (get-weather config rand-generator :temperature)
+            (get-weather config rand-generator :relative-humidity)
+            (get-weather config rand-generator :wind-speed-20ft)
+            (get-weather config rand-generator :wind-from-direction)
+            (get-weather config rand-generator :foliar-moisture)
             (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
             (:outfile-suffix config)
             (:output-geotiffs? config)
