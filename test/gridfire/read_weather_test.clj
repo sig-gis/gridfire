@@ -248,7 +248,7 @@
                                             :elevation          (in-file-path "dem.tif")
                                             :fuel-model         (in-file-path "fbfm40.tif")
                                             :slope              (in-file-path "slp.tif")}
-                       :srid               "CUSTOM:900914"
+                       :srid               "EPSG:32610"
                        :cell-size          98.425 ;; (feet)
                        :ignition-row       [10 90]
                        :ignition-col       [20 80]
