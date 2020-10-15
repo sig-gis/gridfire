@@ -6,6 +6,7 @@
             [clojure.test :refer [deftest is]]
             [gridfire.cli :as cli]
             [gridfire.fetch :as fetch]
+            [magellan.core :refer [read-raster]]
             [mikera.vectorz.core :as v])
   (:import java.util.Random))
 
@@ -87,7 +88,7 @@
 
     (is (= geotiff-results postgis-results))
 
-    (let [numbands (count (:bands (magellan.core/read-raster (in-file-path geotiff-file))))]
+    (let [numbands (count (:bands (read-raster (in-file-path geotiff-file))))]
       (is (= numbands (m/dimension-count geotiff-results 0))))
 
     (let [results  (jdbc/with-db-connection [conn (:db-spec test-config-base)]
@@ -113,7 +114,7 @@
 
     (is (= geotiff-results postgis-results))
 
-    (let [numbands (count (:bands (magellan.core/read-raster (in-file-path geotiff-file))))]
+    (let [numbands (count (:bands (read-raster (in-file-path geotiff-file))))]
       (is (= numbands (m/dimension-count geotiff-results 0))))
 
     (let [results  (jdbc/with-db-connection [conn (:db-spec test-config-base)]
@@ -139,7 +140,7 @@
 
     (is (= geotiff-results postgis-results))
 
-    (let [numbands (count (:bands (magellan.core/read-raster (in-file-path geotiff-file))))]
+    (let [numbands (count (:bands (read-raster (in-file-path geotiff-file))))]
       (is (= numbands (m/dimension-count geotiff-results 0))))
 
     (let [results  (jdbc/with-db-connection [conn (:db-spec test-config-base)]
@@ -165,7 +166,7 @@
 
     (is (= geotiff-results postgis-results))
 
-    (let [numbands (count (:bands (magellan.core/read-raster (in-file-path geotiff-file))))]
+    (let [numbands (count (:bands (read-raster (in-file-path geotiff-file))))]
       (is (= numbands (m/dimension-count geotiff-results 0))))
 
     (let [results  (jdbc/with-db-connection [conn (:db-spec test-config-base)]
@@ -266,3 +267,6 @@
         results (run-simulation config)]
 
     (is (every? some? results))))
+
+(deftest simple-test
+  (is (= 1 1)))
