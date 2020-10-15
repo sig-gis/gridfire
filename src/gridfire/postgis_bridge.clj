@@ -113,7 +113,7 @@
                            rescale-query)
          meta-query      (format "SELECT (ST_Metadata(%s)).* FROM %s"
                                  threshold-query table-name)
-         data-query      (format "SELECT ST_DumpValues(%s,1) AS matrix FROM %s"
+         data-query      (format "SELECT ST_DumpValues(%s) AS matrix FROM %s"
                                  threshold-query table-name)]
      (jdbc/with-db-transaction [conn db-spec]
        (let [metadata (first (jdbc/query conn [meta-query]))
