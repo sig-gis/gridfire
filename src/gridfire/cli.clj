@@ -9,7 +9,8 @@
             [gridfire.fetch :as fetch]
             [gridfire.fire-spread :refer [run-fire-spread]]
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
-            [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
+            [gridfire.postgis-bridge :refer [postgis-raster-to-matrix
+                                             postgis-raster-to-matrix-multiband]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
@@ -185,7 +186,8 @@
                                       :landfire-layers           landfire-rasters
                                       :wind-speed-20ft           (wind-speed-20ft i)
                                       :wind-from-direction       (wind-from-direction i)
-                                      :fuel-moisture             fuel-moisture
+                                      :temperature               (temperature i)
+                                      :relative-humidity         (relative-humidity i)
                                       :foliar-moisture           (* 0.01 (foliar-moisture i))
                                       :ellipse-adjustment-factor (ellipse-adjustment-factor i)
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
@@ -306,10 +308,10 @@
             (draw-samples rand-generator simulations (:ignition-row config))
             (draw-samples rand-generator simulations (:ignition-col config))
             (draw-samples rand-generator simulations (:max-runtime config))
-            (get-weather config rand-generator :temperature)
-            (get-weather config rand-generator :relative-humidity)
-            (get-weather config rand-generator :wind-speed-20ft)
-            (get-weather config rand-generator :wind-from-direction)
+            (get-weather config rand-generator (:elevation landfire-layers) :temperature)
+            (get-weather config rand-generator (:elevation landfire-layers) :relative-humidity)
+            (get-weather config rand-generator (:elevation landfire-layers) :wind-speed-20ft)
+            (get-weather config rand-generator (:elevation landfire-layers) :wind-from-direction)
             (draw-samples rand-generator simulations (:foliar-moisture config))
             (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
             (:outfile-suffix config)

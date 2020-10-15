@@ -1,7 +1,7 @@
 ;; [[file:../../org/GridFire.org::*Magellan][Magellan:1]]
 (ns gridfire.magellan-bridge
   (:require [clojure.core.matrix :as m]
-            [magellan.core :refer [read-raster]]
+            [magellan.core :refer [read-raster resample-raster]]
             [magellan.raster.inspect :as inspect]))
 
 (defn geotiff-raster-to-matrix
