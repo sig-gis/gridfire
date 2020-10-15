@@ -193,27 +193,30 @@
    overflow-trajectory
    overflow-heat
    global-clock]
-  (let [wind-speed-20ft              (if (int? wind-speed-20ft) wind-speed-20ft (wind-speed-20ft-at here wind-speed-20ft global-clock))
-        fuel-moisture                (fuel-moisture here temperature relative-humidity global-clock)
-        fuel-model-number            (m/mget (:fuel-model         landfire-layers) i j)
-        slope                        (m/mget (:slope              landfire-layers) i j)
-        aspect                       (m/mget (:aspect             landfire-layers) i j)
-        canopy-height                (m/mget (:canopy-height      landfire-layers) i j)
-        canopy-base-height           (m/mget (:canopy-base-height landfire-layers) i j)
-        crown-bulk-density           (m/mget (:crown-bulk-density landfire-layers) i j)
-        canopy-cover                 (m/mget (:canopy-cover       landfire-layers) i j)
-        [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model-number fuel-moisture)
-        midflame-wind-speed          (* wind-speed-20ft 88.0 (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
-        spread-info-max              (rothermel-surface-fire-spread-max spread-info-min
-                                                                        midflame-wind-speed
-                                                                        wind-from-direction
-                                                                        slope
-                                                                        aspect
-                                                                        ellipse-adjustment-factor)
-        crown-spread-max             (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
-                                                             (-> fuel-moisture :dead :1hr))
-        crown-eccentricity           (crown-fire-eccentricity wind-speed-20ft
-                                                              ellipse-adjustment-factor)]
+  (let [wind-speed-20ft     (if (int? wind-speed-20ft)
+                              wind-speed-20ft
+                              (wind-speed-20ft-at here wind-speed-20ft global-clock))
+        fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock)
+        fuel-model-number   (m/mget (:fuel-model         landfire-layers) i j)
+        slope               (m/mget (:slope              landfire-layers) i j)
+        aspect              (m/mget (:aspect             landfire-layers) i j)
+        canopy-height       (m/mget (:canopy-height      landfire-layers) i j)
+        canopy-base-height  (m/mget (:canopy-base-height landfire-layers) i j)
+        crown-bulk-density  (m/mget (:crown-bulk-density landfire-layers) i j)
+        canopy-cover        (m/mget (:canopy-cover       landfire-layers) i j)
+        [fuel-model
+         spread-info-min]   (rothermel-fast-wrapper fuel-model-number fuel-moisture)
+        midflame-wind-speed (* wind-speed-20ft 88.0 (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
+        spread-info-max     (rothermel-surface-fire-spread-max spread-info-min
+                                                               midflame-wind-speed
+                                                               wind-from-direction
+                                                               slope
+                                                               aspect
+                                                               ellipse-adjustment-factor)
+        crown-spread-max    (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
+                                                    (-> fuel-moisture :dead :1hr))
+        crown-eccentricity  (crown-fire-eccentricity wind-speed-20ft
+                                                     ellipse-adjustment-factor)]
     (into []
           (comp
            (filter #(and (in-bounds? num-rows num-cols %)
