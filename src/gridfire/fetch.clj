@@ -27,14 +27,14 @@
 ;;-----------------------------------------------------------------------------
 
 (defmulti weather
-  (fn [config target-raster-for-resample type]
+  (fn [config raster-for-resample type]
     (let [stype  (name type)
           method ((keyword (s/join "-" ["fetch" stype "method"])) config)]
       (keyword (str (name method) "-" stype)))))
 
 (defmethod weather :postgis-temperature
-  [{:keys [temperature db-spec] :as config} target-raster-for-resample type]
-  (let [scalex (:scalex target-raster-for-resample)]
+  [{:keys [temperature db-spec] :as config} raster-for-resample type]
+  (let [scalex (:scalex raster-for-resample)]
     (:matrix (postgis-raster-to-matrix-multiband
               db-spec
               temperature
@@ -42,14 +42,14 @@
               nil))))
 
 (defmethod weather :geotiff-temperature
-  [{:keys [temperature] :as config} target-raster-for-resample type]
+  [{:keys [temperature] :as config} raster-for-resample type]
   (:matrix (geotiff-raster-to-matrix-multiband
             temperature
-            (:grid target-raster-for-resample))))
+            (:grid raster-for-resample))))
 
 (defmethod weather :postgis-relative-humidity
-  [{:keys [relative-humidity db-spec] :as config} target-raster-for-resample type]
-  (let [scalex (:scalex target-raster-for-resample)]
+  [{:keys [relative-humidity db-spec] :as config} raster-for-resample type]
+  (let [scalex (:scalex raster-for-resample)]
     (:matrix (postgis-raster-to-matrix-multiband
               db-spec
               relative-humidity
@@ -57,14 +57,14 @@
               nil))))
 
 (defmethod weather :geotiff-relative-humidity
-  [{:keys [relative-humidity] :as config} target-raster-for-resample type]
+  [{:keys [relative-humidity] :as config} raster-for-resample type]
   (:matrix (geotiff-raster-to-matrix-multiband
             relative-humidity
-            (:grid target-raster-for-resample))))
+            (:grid raster-for-resample))))
 
 (defmethod weather :postgis-wind-speed-20ft
-  [{:keys [wind-speed-20ft db-spec] :as config} target-raster-for-resample type]
-  (let [scalex (:scalex target-raster-for-resample)]
+  [{:keys [wind-speed-20ft db-spec] :as config} raster-for-resample type]
+  (let [scalex (:scalex raster-for-resample)]
     (:matrix (postgis-raster-to-matrix-multiband
               db-spec
               wind-speed-20ft
@@ -72,14 +72,14 @@
               nil))))
 
 (defmethod weather :geotiff-wind-speed-20ft
-  [{:keys [wind-speed-20ft] :as config} target-raster-for-resample type]
+  [{:keys [wind-speed-20ft] :as config} raster-for-resample type]
   (:matrix (geotiff-raster-to-matrix-multiband
             wind-speed-20ft
-            (:grid target-raster-for-resample))))
+            (:grid raster-for-resample))))
 
 (defmethod weather :postgis-wind-from-direction
-  [{:keys [wind-from-direction db-spec] :as config} target-raster-for-resample type]
-  (let [scalex (:scalex target-raster-for-resample)]
+  [{:keys [wind-from-direction db-spec] :as config} raster-for-resample type]
+  (let [scalex (:scalex raster-for-resample)]
     (:matrix (postgis-raster-to-matrix-multiband
               db-spec
               wind-from-direction
@@ -87,8 +87,8 @@
               nil))))
 
 (defmethod weather :geotiff-wind-from-direction
-  [{:keys [wind-from-direction] :as config} target-raster-for-resample type]
+  [{:keys [wind-from-direction] :as config} raster-for-resample type]
   (:matrix (geotiff-raster-to-matrix-multiband
             wind-from-direction
-            (:grid target-raster-for-resample))))
+            (:grid raster-for-resample))))
 ;; Section 2: Ignition from which to build simulation inputs:4 ends here
