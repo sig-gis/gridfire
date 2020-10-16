@@ -206,7 +206,8 @@
         canopy-cover        (m/mget (:canopy-cover       landfire-layers) i j)
         [fuel-model
          spread-info-min]   (rothermel-fast-wrapper fuel-model-number fuel-moisture)
-        midflame-wind-speed (* wind-speed-20ft 88.0 (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
+        midflame-wind-speed (* wind-speed-20ft 88.0
+                               (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
         spread-info-max     (rothermel-surface-fire-spread-max spread-info-min
                                                                midflame-wind-speed
                                                                wind-from-direction

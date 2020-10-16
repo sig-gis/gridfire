@@ -61,7 +61,8 @@
      (:output-geotiffs? config)
      (:output-pngs? config)
      (:output-csvs? config)
-     ignition-rasters)))
+     ignition-rasters
+     config)))
 
 (def target-raster-for-resample
   (mb/geotiff-raster-to-matrix (in-file-path "asp.tif")))
@@ -268,5 +269,3 @@
 
     (is (every? some? results))))
 
-(deftest simple-test
-  (is (= 1 1)))
