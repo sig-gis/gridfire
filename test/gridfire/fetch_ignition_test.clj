@@ -1,8 +1,6 @@
-(ns gridfire.ignition-test
+(ns gridfire.fetch-ignition-test
   (:require [clojure.test :refer [deftest is testing]]
-            [gridfire.cli :as gf]
-            [gridfire.fetch :as fetch])
-  (:import java.util.Random))
+            [gridfire.fetch :as fetch]))
 
 ;;-----------------------------------------------------------------------------
 ;; Config
@@ -38,7 +36,7 @@
    :simulations               1
    :random-seed               1234567890 ;; long value (optional)
    :output-csvs?              true
-   :fetch-layer-method        :postgis})
+    :fetch-layer-method        :postgis })
 
 ;;-----------------------------------------------------------------------------
 ;; Utils
@@ -46,34 +44,6 @@
 
 (defn in-file-path [filename]
   (str resources-path filename))
-
-(defn run-simulation [config]
-  (let [simulations      (:simulations config)
-        rand-generator   (if-let [seed (:random-seed config)]
-                           (Random. seed)
-                           (Random.))
-        landfire-layers  (gf/fetch-landfire-layers config)
-        landfire-matrix  (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
-        ignition-raster  (fetch/initial-ignition-layers config)]
-    (gf/run-simulations
-     simulations
-     landfire-matrix
-     (gf/get-envelope config landfire-layers)
-     (:cell-size config)
-     (gf/draw-samples rand-generator simulations (:ignition-row config))
-     (gf/draw-samples rand-generator simulations (:ignition-col config))
-     (gf/draw-samples rand-generator simulations (:max-runtime config))
-     (gf/draw-samples rand-generator simulations (:temperature config))
-     (gf/draw-samples rand-generator simulations (:relative-humidity config))
-     (gf/draw-samples rand-generator simulations (:wind-speed-20ft config))
-     (gf/draw-samples rand-generator simulations (:wind-from-direction config))
-     (gf/draw-samples rand-generator simulations (:foliar-moisture config))
-     (gf/draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
-     (:outfile-suffix config)
-     (:output-geotiffs? config)
-     (:output-pngs? config)
-     (:output-csvs? config)
-     ignition-raster)))
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
@@ -100,20 +70,3 @@
           geotiff-ignition-layers (fetch/initial-ignition-layers geotiff-config)]
 
       (is (nil? geotiff-ignition-layers)))))
-
-(deftest geotiff-ignition-test
-  (testing "Running simulation with ignition layers read from geotiff files"
-    (let [geotiff-config (merge test-config-base
-                                {:fetch-ignition-method :geotiff
-                                 :ignition-layer        (in-file-path "ign.tif")})
-          results        (run-simulation geotiff-config)]
-
-      (is (every? some? results)))))
-
-(deftest postgis-ignition-test
-  (testing "Running simulation with ignition layers read from geotiff files"
-    (let [postgis-config (merge test-config-base
-                                {:fetch-ignition-method :postgis
-                                 :ignition-layer        "ignition.ign WHERE rid=1"})
-          results (run-simulation postgis-config)]
-      (is (every? some? results)))))

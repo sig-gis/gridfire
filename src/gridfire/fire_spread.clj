@@ -11,7 +11,8 @@
             [gridfire.crown-fire :refer [van-wagner-crown-fire-initiation?
                                          cruz-crown-fire-spread
                                          crown-fire-line-intensity
-                                         crown-fire-eccentricity]]))
+                                         crown-fire-eccentricity]]
+            [mikera.vectorz.core :as v]))
 
 (m/set-current-implementation :vectorz)
 
@@ -145,29 +146,19 @@
            :otherwise (+ 21.0606 (* 0.005565 rh rh) (* -0.00035 rh temp) (* -0.483199 rh)))
      30))
 
-(defn temperature-at
-  [[i j] global-clock temperature-raster]
+(defn sample-at
+  [[i j] global-clock raster]
   (let [band (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
-    (m/mget temperature-raster band i j)))
-
-(defn humidity-at
-  [[i j] global-clock relative-humidity-raster]
-  (let [band (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
-    (m/mget relative-humidity-raster band i j)))
-
-(defn wind-speed-20ft-at
-  [[i j] global-clock wind-speed-20ft-raster]
-  (let [band (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
-    (m/mget wind-speed-20ft-raster band i j)))
+    (m/mget raster band i j)))
 
 (defn fuel-moisture [here temperature relative-humidity global-clock]
-  (let [temperature          (if (int? temperature)
-                               temperature
-                               (temperature-at here global-clock temperature))
-        humidity             (if (int? relative-humidity)
-                               relative-humidity
-                               (humidity-at here global-clock relative-humidity))
-        equilibrium-moisture (calc-emc relative-humidity temperature)]
+  (let [tmp                  (if (v/vectorz? temperature)
+                               (sample-at here global-clock temperature)
+                               temperature)
+        rh                   (if (v/vectorz? relative-humidity)
+                               (sample-at here global-clock relative-humidity)
+                               relative-humidity)
+        equilibrium-moisture (calc-emc rh tmp)]
     {:dead {:1hr   (+ equilibrium-moisture 0.002)
             :10hr  (+ equilibrium-moisture 0.015)
             :100hr (+ equilibrium-moisture 0.025)}
@@ -193,9 +184,12 @@
    overflow-trajectory
    overflow-heat
    global-clock]
-  (let [wind-speed-20ft     (if (int? wind-speed-20ft)
-                              wind-speed-20ft
-                              (wind-speed-20ft-at here wind-speed-20ft global-clock))
+  (let [wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
+                              (sample-at here global-clock wind-speed-20ft)
+                              wind-speed-20ft)
+        wind-from-direction (if (v/vectorz? wind-from-direction)
+                              (sample-at here global-clock wind-from-direction)
+                              wind-from-direction)
         fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock)
         fuel-model-number   (m/mget (:fuel-model         landfire-layers) i j)
         slope               (m/mget (:slope              landfire-layers) i j)

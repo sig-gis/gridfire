@@ -1,13 +1,8 @@
 (ns gridfire.cli-test
-  (:require [clojure.core.matrix :as m]
-            [clojure.data.csv :as csv]
-            [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.java.jdbc :as jdbc]
-            [clojure.test :refer [deftest is testing]]
-            [magellan.core :as mg]
-            [gridfire.cli :as gf])
-  (:import (java.util Random)))
+  (:require [clojure.test :refer [deftest is testing]]
+            [gridfire.cli :as cli]
+            [gridfire.fetch :as fetch])
+  (:import java.util.Random))
 
 ;;-----------------------------------------------------------------------------
 ;; Config
@@ -23,6 +18,15 @@
 
 (def test-config-base
   {:db-spec                   db-spec
+   :fetch-layer-method        :postgis
+   :landfire-layers           {:aspect             "landfire.asp WHERE rid=1"
+                               :canopy-base-height "landfire.cbh WHERE rid=1"
+                               :canopy-cover       "landfire.cc WHERE rid=1"
+                               :canopy-height      "landfire.ch WHERE rid=1"
+                               :crown-bulk-density "landfire.cbd WHERE rid=1"
+                               :fuel-model         "landfire.fbfm40 WHERE rid=1"
+                               :slope              "landfire.slp WHERE rid=1"
+                               :elevation          "landfire.dem WHERE rid=1"}
    :srid                      "CUSTOM:900914"
    :cell-size                 98.425     ;; (feet)
    :ignition-row              [10 10]
@@ -44,6 +48,36 @@
 
 (defn in-file-path [filename]
   (str resources-path filename))
+
+(defn run-simulation [config]
+  (let [simulations      (:simulations config)
+        rand-generator   (if-let [seed (:random-seed config)]
+                           (Random. seed)
+                           (Random.))
+        landfire-layers  (cli/fetch-landfire-layers config)
+        landfire-matrix  (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
+        ignition-layers  (fetch/initial-ignition-layers config)
+        ignition-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) ignition-layers)]
+    (cli/run-simulations
+     simulations
+     landfire-matrix
+     (cli/get-envelope config landfire-layers)
+     (:cell-size config)
+     (cli/draw-samples rand-generator simulations (:ignition-row config))
+     (cli/draw-samples rand-generator simulations (:ignition-col config))
+     (cli/draw-samples rand-generator simulations (:max-runtime config))
+     (cli/get-weather config rand-generator (:elevation landfire-layers) :temperature)
+     (cli/get-weather config rand-generator (:elevation landfire-layers) :relative-humidity)
+     (cli/get-weather config rand-generator (:elevation landfire-layers) :wind-speed-20ft)
+     (cli/get-weather config rand-generator (:elevation landfire-layers) :wind-from-direction)
+     (cli/draw-samples rand-generator simulations (:foliar-moisture config))
+     (cli/draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
+     (:outfile-suffix config)
+     (:output-geotiffs? config)
+     (:output-pngs? config)
+     (:output-csvs? config)
+     ignition-rasters
+     config)))
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
@@ -71,8 +105,8 @@
                                                :fuel-model         (in-file-path "fbfm40.tif")
                                                :slope              (in-file-path "slp.tif")}
                           :fetch-layer-method :geotiff}
-          postgis        (gf/fetch-landfire-layers postgis-config)
-          geotiff        (gf/fetch-landfire-layers geotiff-config)]
+          postgis        (cli/fetch-landfire-layers postgis-config)
+          geotiff        (cli/fetch-landfire-layers geotiff-config)]
 
       (is (= (get-in postgis [:aspect :matrix])
              (get-in geotiff [:aspect :matrix])))
@@ -98,8 +132,12 @@
       ;; TODO Add test for envelope
       )))
 
+;;-----------------------------------------------------------------------------
+;; Landfire Layer Tests
+;;-----------------------------------------------------------------------------
+
 (deftest run-simulation-test
-  (testing "Running simulation with different ways to fetch layers"
+  (testing "Running simulation with different ways to fetch landfire layers"
     (let [postgis-config  (merge test-config-base
                                  {:landfire-layers    {:aspect             "landfire.asp WHERE rid=1"
                                                        :canopy-base-height "landfire.cbh WHERE rid=1"
@@ -121,57 +159,129 @@
                                                        :slope              (in-file-path "slp.tif")}
                                   :fetch-layer-method :geotiff})
           simulations     (:simulations test-config-base)
-          rand-generator  (if-let [seed (:random-seed test-config-base)]
-                            (Random. seed)
-                            (Random.))
-          postgis-layers  (gf/fetch-landfire-layers postgis-config)
-          postgis-results (gf/run-simulations
-                           simulations
-                           (reduce (fn [acc [layer info]] (assoc acc layer (:matrix info)))
-                                   {}
-                                   postgis-layers)
-                           (gf/get-envelope postgis-config postgis-layers)
-                           (:cell-size test-config-base)
-                           (gf/draw-samples rand-generator simulations (:ignition-row test-config-base))
-                           (gf/draw-samples rand-generator simulations (:ignition-col test-config-base))
-                           (gf/draw-samples rand-generator simulations (:max-runtime test-config-base))
-                           (gf/draw-samples rand-generator simulations (:temperature test-config-base))
-                           (gf/draw-samples rand-generator simulations (:relative-humidity test-config-base))
-                           (gf/draw-samples rand-generator simulations (:wind-speed-20ft test-config-base))
-                           (gf/draw-samples rand-generator simulations (:wind-from-direction test-config-base))
-                           (gf/draw-samples rand-generator simulations (:foliar-moisture test-config-base))
-                           (gf/draw-samples rand-generator simulations (:ellipse-adjustment-factor test-config-base))
-                           (:outfile-suffix test-config-base)
-                           (:output-geotiffs? test-config-base)
-                           (:output-pngs? test-config-base)
-                           (:output-csvs? test-config-base)
-                           nil)
+          postgis-layers  (cli/fetch-landfire-layers postgis-config)
+          postgis-results (run-simulation postgis-config)
 
-          geotiff-layers  (gf/fetch-landfire-layers geotiff-config)
-          geotiff-results (gf/run-simulations
-                           simulations
-                           (reduce (fn [acc [layer info]] (assoc acc layer (:matrix info)))
-                                   {}
-                                   geotiff-layers)
-                           (gf/get-envelope geotiff-config geotiff-layers)
-                           (:cell-size test-config-base)
-                           (gf/draw-samples rand-generator simulations (:ignition-row test-config-base))
-                           (gf/draw-samples rand-generator simulations (:ignition-col test-config-base))
-                           (gf/draw-samples rand-generator simulations (:max-runtime test-config-base))
-                           (gf/draw-samples rand-generator simulations (:temperature test-config-base))
-                           (gf/draw-samples rand-generator simulations (:relative-humidity test-config-base))
-                           (gf/draw-samples rand-generator simulations (:wind-speed-20ft test-config-base))
-                           (gf/draw-samples rand-generator simulations (:wind-from-direction test-config-base))
-                           (gf/draw-samples rand-generator simulations (:foliar-moisture test-config-base))
-                           (gf/draw-samples rand-generator simulations (:ellipse-adjustment-factor test-config-base))
-                           (:outfile-suffix test-config-base)
-                           (:output-geotiffs? test-config-base)
-                           (:output-pngs? test-config-base)
-                           (:output-csvs? test-config-base)
-                           nil)]
+          geotiff-layers  (cli/fetch-landfire-layers geotiff-config)
+          geotiff-results (run-simulation geotiff-config)]
 
       (is (every? some? postgis-results))
 
       (is (every? some? geotiff-results))
 
       (is (= (set postgis-results) (set geotiff-results))))))
+
+;;-----------------------------------------------------------------------------
+;; Ignition Layer Tests
+;;-----------------------------------------------------------------------------
+
+(deftest geotiff-ignition-test
+  (testing "Running simulation with ignition layers read from geotiff files"
+    (let [geotiff-config (merge test-config-base
+                                {:fetch-ignition-method
+                                 :geotiff
+
+                                 :ignition-layers
+                                 {:initial-fire-spread         (in-file-path "scar.tif")
+                                  :initial-fire-line-intensity (in-file-path "ifi.tif")
+                                  :initial-flame-length        (in-file-path "ifl.tif")}})
+          results (run-simulation geotiff-config)]
+
+      (is (every? some? results)))))
+
+(deftest postgis-ignition-test
+  (testing "Running simulation with ignition layers read from geotiff files"
+    (let [postgis-config (merge test-config-base
+                                {:fetch-ignition-method
+                                 :postgis
+
+                                 :ignition-layers
+                                 {:initial-fire-spread         "ignition.scar WHERE rid=1"
+                                  :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
+                                  :initial-flame-length        "ignition.ifl WHERE rid=1"}})
+          results (run-simulation postgis-config)]
+      (is (every? some? results)))))
+
+;;-----------------------------------------------------------------------------
+;; Weather Layer Tests
+;;-----------------------------------------------------------------------------
+
+(def landfire-layers-weather-test
+  {:aspect             (in-file-path "weather-test/asp.tif")
+   :canopy-base-height (in-file-path "weather-test/cbh.tif")
+   :canopy-cover       (in-file-path "weather-test/cc.tif")
+   :canopy-height      (in-file-path "weather-test/ch.tif")
+   :crown-bulk-density (in-file-path "weather-test/cbd.tif")
+   :elevation          (in-file-path "weather-test/dem.tif")
+   :fuel-model         (in-file-path "weather-test/fbfm40.tif")
+   :slope              (in-file-path "weather-test/slp.tif")})
+
+(deftest run-simulation-using-temperature-raster-test
+  (testing "Running simulation using temperature data from geotiff file"
+    (let [config  (merge test-config-base
+                         {:fetch-layer-method       :geotiff
+                          :landfire-layers          landfire-layers-weather-test
+                          :max-runtime              120
+                          :fetch-temperature-method :geotiff
+                          :temperature              (in-file-path "weather-test/tmpf_to_sample.tif")})
+          results (run-simulation config)]
+
+      (is (every? some? results)))))
+
+(deftest run-simulation-using-relative-humidity-raster-test
+  (testing "Running simulation using relative humidity data from geotiff file"
+    (let [config  (merge test-config-base
+                         {:fetch-layer-method       :geotiff
+                          :landfire-layers          landfire-layers-weather-test
+                          :max-runtime              120
+                          :fetch-temperature-method :geotiff
+                          :temperature              (in-file-path "weather-test/rh_to_sample.tif")})
+          results (run-simulation config)]
+
+      (is (every? some? results)))))
+
+(deftest run-simulation-using-wind-speed-raster-test
+  (testing "Running simulation using wind speed data from geotiff file"
+    (let [config  (merge test-config-base
+                         {:fetch-layer-method       :geotiff
+                          :landfire-layers          landfire-layers-weather-test
+                          :max-runtime              120
+                          :fetch-temperature-method :geotiff
+                          :temperature              (in-file-path "weather-test/ws_to_sample.tif")})
+          results (run-simulation config)]
+
+      (is (every? some? results)))))
+
+(deftest run-simulation-using-wind-direction-raster-test
+  (testing "Running simulation using wind direction data from geotiff file"
+    (let [config  (merge test-config-base
+                         {:fetch-layer-method       :geotiff
+                          :landfire-layers          landfire-layers-weather-test
+                          :max-runtime              120
+                          :fetch-temperature-method :geotiff
+                          :temperature              (in-file-path "weather-test/wd_to_sample.tif")})
+          results (run-simulation config)]
+
+      (is (every? some? results)))))
+
+(deftest geotiff-landfire-weather-ignition
+  (testing "Running simulation using landfire, weather, and ignition data from geotiff files"
+    (let [config  (merge test-config-base
+                         {:fetch-layer-method               :geotiff
+                          :landfire-layers                  landfire-layers-weather-test
+                          :fetch-ignition-method            :geotiff
+                          :ignition-layers                  {:initial-fire-spread         (in-file-path "scar.tif")
+                                                             :initial-fire-line-intensity (in-file-path "ifi.tif")
+                                                             :initial-flame-length        (in-file-path "ifl.tif")}
+                          :fetch-temperature-method         :geotiff
+                          :temperature                      (in-file-path "weather-test/tmpf_to_sample.tif")
+                          :fetch-relative-humidity-method   :geotiff
+                          :relative-humidity                (in-file-path "weather-test/rh_to_sample.tif")
+                          :fetch-wind-speed-20ft-method     :geotiff
+                          :wind-speed-20ft                  (in-file-path "weather-test/ws_to_sample.tif")
+                          :fetch-wind-from-direction-method :geotiff
+                          :wind-from-direction              (in-file-path "weather-test/wd_to_sample.tif")
+                          :max-runtime                      120})
+          results (run-simulation config)]
+
+      (is (every? some? results)))))
