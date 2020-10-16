@@ -184,10 +184,10 @@
                                      {:max-runtime               (max-runtime i)
                                       :cell-size                 cell-size
                                       :landfire-layers           landfire-rasters
-                                      :wind-speed-20ft           (wind-speed-20ft i)
-                                      :wind-from-direction       (wind-from-direction i)
-                                      :temperature               (temperature i)
-                                      :relative-humidity         (relative-humidity i)
+                                      :wind-speed-20ft           wind-speed-20ft
+                                      :wind-from-direction       wind-from-direction
+                                      :temperature               temperature
+                                      :relative-humidity         relative-humidity
                                       :foliar-moisture           (* 0.01 (foliar-moisture i))
                                       :ellipse-adjustment-factor (ellipse-adjustment-factor i)
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
@@ -210,10 +210,10 @@
                :ignition-col              (ignition-col i)
                :ignition-raster           ignition-raster
                :max-runtime               (max-runtime i)
-               :temperature               (temperature i)
-               :relative-humidity         (relative-humidity i)
-               :wind-speed-20ft           (wind-speed-20ft i)
-               :wind-from-direction       (wind-from-direction i)
+               :temperature               temperature
+               :relative-humidity         relative-humidity
+               :wind-speed-20ft           wind-speed-20ft
+               :wind-from-direction       wind-from-direction
                :foliar-moisture           (foliar-moisture i)
                :ellipse-adjustment-factor (ellipse-adjustment-factor i)}
               (summarize-fire-spread-results fire-spread-results cell-size))))
@@ -222,10 +222,10 @@
             :ignition-col               (ignition-col i)
             :ignition-raster            ignition-raster
             :max-runtime                (max-runtime i)
-            :temperature                (temperature i)
-            :relative-humidity          (relative-humidity i)
-            :wind-speed-20ft            (wind-speed-20ft i)
-            :wind-from-direction        (wind-from-direction i)
+            :temperature                temperature
+            :relative-humidity          relative-humidity
+            :wind-speed-20ft            wind-speed-20ft
+            :wind-from-direction        wind-from-direction
             :foliar-moisture            (foliar-moisture i)
             :ellipse-adjustment-factor  (ellipse-adjustment-factor i)
             :fire-size                  0.0
@@ -272,13 +272,12 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-
-(defn get-weather [config rand-generator weather-type]
+(defn get-weather [config rand-generator landfire-raster weather-type]
   (let [val          (config weather-type)
         fetch-method (keyword (s/join "-" ["fetch" (name weather-type) "method"]))
         n            (:simulations config)]
     (if (contains? config fetch-method)
-      (let [raster (fetch/weather config weather-type)]
+      (let [raster (fetch/weather config landfire-raster weather-type)]
         raster)
       (draw-samples rand-generator n val))))
 
