@@ -9,8 +9,7 @@
             [gridfire.fetch :as fetch]
             [gridfire.fire-spread :refer [run-fire-spread]]
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
-            [gridfire.postgis-bridge :refer [postgis-raster-to-matrix
-                                             postgis-raster-to-matrix-multiband]]
+            [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
@@ -172,14 +171,12 @@
    outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-raster]
   (mapv
    (fn [i]
-     (let [equilibrium-moisture  (calc-emc (relative-humidity i) (temperature i))
-           fuel-moisture         {:dead {:1hr   (+ equilibrium-moisture 0.002)
-                                         :10hr  (+ equilibrium-moisture 0.015)
-                                         :100hr (+ equilibrium-moisture 0.025)}
-                                  :live {:herbaceous (* equilibrium-moisture 2.0)
-                                         :woody      (* equilibrium-moisture 0.5)}}
-           initial-ignition-site (or ignition-raster
-                                     [(ignition-row i) (ignition-col i)])]
+     (let [initial-ignition-site (or ignition-raster
+                                     [(ignition-row i) (ignition-col i)])
+           temperature           (if (config :fetch-temperature-method) temperature (temperature i))
+           wind-speed-20ft       (if (config :fetch-wind-speed-20ft-method) wind-speed-20ft (wind-speed-20ft i))
+           wind-from-direction   (if (config :fetch-wind-from-direction-method) wind-from-direction (wind-from-direction i))
+           relative-humidity     (if (config :fetch-relative-humidity-method) relative-humidity (relative-humidity i))]
        (if-let [fire-spread-results (run-fire-spread
                                      {:max-runtime               (max-runtime i)
                                       :cell-size                 cell-size
