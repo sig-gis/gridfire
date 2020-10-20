@@ -167,7 +167,7 @@
   [simulations landfire-rasters envelope cell-size ignition-row
    ignition-col max-runtime temperature relative-humidity wind-speed-20ft
    wind-from-direction foliar-moisture ellipse-adjustment-factor
-   outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-rasters]
+   outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-raster]
   (mapv
    (fn [i]
      (let [equilibrium-moisture  (calc-emc (relative-humidity i) (temperature i))
@@ -176,9 +176,8 @@
                                          :100hr (+ equilibrium-moisture 0.025)}
                                   :live {:herbaceous (* equilibrium-moisture 2.0)
                                          :woody      (* equilibrium-moisture 0.5)}}
-           initial-ignition-site (if (seq ignition-rasters)
-                                   ignition-rasters
-                                   [(ignition-row i) (ignition-col i)])]
+           initial-ignition-site (or ignition-raster
+                                     [(ignition-row i) (ignition-col i)])]
        (if-let [fire-spread-results (run-fire-spread
                                      {:max-runtime               (max-runtime i)
                                       :cell-size                 cell-size
@@ -206,7 +205,7 @@
              (merge
               {:ignition-row              (ignition-row i)
                :ignition-col              (ignition-col i)
-               :ignition-rasters          ignition-rasters
+               :ignition-raster           ignition-raster
                :max-runtime               (max-runtime i)
                :temperature               (temperature i)
                :relative-humidity         (relative-humidity i)
@@ -218,7 +217,7 @@
          (when output-csvs?
            {:ignition-row               (ignition-row i)
             :ignition-col               (ignition-col i)
-            :ignition-rasters           ignition-rasters
+            :ignition-raster            ignition-raster
             :max-runtime                (max-runtime i)
             :temperature                (temperature i)
             :relative-humidity          (relative-humidity i)

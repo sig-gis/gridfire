@@ -6,7 +6,6 @@
             [magellan.raster.inspect :as inspect]))
 
 (defmulti initial-ignition-layers
-  "Returns a map of ignition rasters (represented as maps) "
   (fn [config]
     (:fetch-ignition-method config)))
 
