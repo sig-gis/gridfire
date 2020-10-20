@@ -270,14 +270,6 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-(defn get-ignition-rasters [layers]
-  (let [ignition-rasters (into {}
-                               (map (fn [[layer-name info]] [layer-name (:matrix info)]))
-                               layers)]
-    (if (seq ignition-rasters)
-      ignition-rasters
-      nil)))
-
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
@@ -286,8 +278,7 @@
           landfire-rasters (into {}
                                  (map (fn [[layer info]] [layer (:matrix info)]))
                                  landfire-layers)
-          ignition-layers  (fetch/initial-ignition-layers config)
-          ignition-rasters (get-ignition-rasters ignition-layers)
+          ignition-raster  (fetch/initial-ignition-layers config)
           envelope         (get-envelope config landfire-layers)
           simulations      (:simulations config)
           rand-generator   (if-let [seed (:random-seed config)]
@@ -315,7 +306,7 @@
             (:output-geotiffs? config)
             (:output-pngs? config)
             (:output-csvs? config)
-            ignition-rasters)
+            ignition-raster)
            (write-csv-outputs
             (:output-csvs? config)
             (str "summary_stats" (:outfile-suffix config) ".csv"))))))

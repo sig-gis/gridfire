@@ -15,9 +15,7 @@
 
  ;; Section 2: Ignition from which to build simulation inputs
  :fetch-ignition-method     :geotiff
- :ignition-layers           {:initial-fire-spread         "test/gridfire/resources/scar.tif"
-                             :initial-fire-line-intensity "test/gridfire/resources/ifi.tif"
-                             :initial-flame-length        "test/gridfire/resources/ifl.tif"}
+ :ignition-layers           "test/gridfire/resources/scar.tif"
 
  ;; Section 3: Weather data from which to build simulation inputs
  ;; For all options in this section, you may enter values in one of three ways:

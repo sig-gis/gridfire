@@ -2095,26 +2095,35 @@ pseudo-code lays out the steps taken in this procedure:
                             initial-ignition-site
                             nil
                             0.0)}]
-       (run-loop (merge
-                  constants
-                  {:initial-ignition-site initial-ignition-site})
-                 ignited-cells
-                 fire-spread-matrix
-                 flame-length-matrix
-                 fire-line-intensity-matrix)))))
+        (run-loop (merge
+                   constants
+                   {:initial-ignition-site initial-ignition-site})
+                  ignited-cells
+                  fire-spread-matrix
+                  flame-length-matrix
+                  fire-line-intensity-matrix)))))
 
-(defn- non-zero-indices [m]
+(defn- initialize-matrix
+  [num-rows num-cols indices]
+  (let [matrix (m/zero-matrix num-rows num-cols)]
+    (doseq [[i j] indices
+            :when (in-bounds? num-rows num-cols [i j])]
+      (m/mset! matrix i j -1))
+    matrix))
+
+(defn- get-non-zero-indices [m]
   (for [[r cols] (map-indexed vector (m/non-zero-indices m))
-        c cols]
+        c        cols]
     [r c]))
 
-(defmethod run-fire-spread clojure.lang.PersistentArrayMap
-  [{:keys [landfire-layers] :as constants} initial-ignition-raster]
-  (let [fire-spread-matrix         (:initial-fire-spread initial-ignition-raster)
-        flame-length-matrix        (:initial-flame-length initial-ignition-raster)
-        fire-line-intensity-matrix (:initial-fire-line-intensity initial-ignition-raster)
+(defmethod run-fire-spread clojure.lang.PersistentHashMap
+  [{:keys [landfire-layers num-rows num-cols] :as constants} initial-ignition-raster]
+  (let [fire-spread-matrix         (:matrix initial-ignition-raster)
+        non-zero-indices           (get-non-zero-indices fire-spread-matrix)
+        flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices)
+        fire-line-intensity-matrix (initialize-matrix num-cols num-cols non-zero-indices)
         ignited-cells              (into {}
-                                         (for [index (non-zero-indices fire-spread-matrix)
+                                         (for [index non-zero-indices
                                                :let  [ignition-trajectories
                                                       (compute-neighborhood-fire-spread-rates!
                                                        constants
@@ -2597,14 +2606,6 @@ or false:
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-(defn get-ignition-rasters [layers]
-  (let [ignition-rasters (into {}
-                               (map (fn [[layer-name info]] [layer-name (:matrix info)]))
-                               layers)]
-    (if (seq ignition-rasters)
-      ignition-rasters
-      nil)))
-
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
@@ -2613,8 +2614,7 @@ or false:
           landfire-rasters (into {}
                                  (map (fn [[layer info]] [layer (:matrix info)]))
                                  landfire-layers)
-          ignition-layers  (fetch/initial-ignition-layers config)
-          ignition-rasters (get-ignition-rasters ignition-layers)
+          ignition-raster  (fetch/initial-ignition-layers config)
           envelope         (get-envelope config landfire-layers)
           simulations      (:simulations config)
           rand-generator   (if-let [seed (:random-seed config)]
@@ -2642,7 +2642,7 @@ or false:
             (:output-geotiffs? config)
             (:output-pngs? config)
             (:output-csvs? config)
-            ignition-rasters)
+            ignition-raster)
            (write-csv-outputs
             (:output-csvs? config)
             (str "summary_stats" (:outfile-suffix config) ".csv"))))))
@@ -2745,25 +2745,21 @@ read rasters from a PostGIS database or a raster file on disk.
 To initialize a burn paremeter from a raster in our PostGIS database include the
 following mappings:
 - *fetch-ignition-method*: a keyword to denote which method we want to use
-- *ignition-layers*: a mapping of layer names to a partial sql statement
+- *ignition-layers*: a partial sql statement
 
 #+begin_src clojure
 {:fetch-ignition-method :postgis
- :ignition-layers       {:initial-fire-spread         "ignition.scar WHERE rid=1"
-                         :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
-                         :initial-flame-length        "ignition.ifl WHERE rid=1"}}
+ :ignition-layers       "ignition.scar WHERE rid=1"}
 #+end_src
 
 To initialize a burn paremeter from a raster file on disk include the
 following mappings:
 - *fetch-ignition-method*: a keyword to denote which method we want to use
-- *ignition-layers*: a mapping of layer names to filepaths
+- *ignition-layers*: a filepath
 
 #+begin_src clojure
 {:fetch-ignition-method :geotiff
- :ignition-layers       {:initial-fire-spread         "test/gridfire/resources/scar.tif"
-                         :initial-fire-line-intensity "test/gridfire/resources/ifi.tif"
-                         :initial-flame-length        "test/gridfire/resources/ifl.tif"}}
+ :ignition-layers       "test/gridfire/resources/scar.tif"}
 #+end_src
 
 Gridfire makes use of clojure's multimethods to dispatch control to
@@ -2777,38 +2773,18 @@ this functionality.
             [magellan.core :as mg]
             [magellan.raster.inspect :as inspect]))
 
-(def ignition-names
-  [:initial-fire-spread
-   :initial-flame-length
-   :initial-fire-line-intensity])
-
 (defmulti initial-ignition-layers
-  "Returns a map of ignition rasters (represented as maps):
-  {:initial-fire-spread         raster-map
-   :initial-flame-length        raster-map
-   :initial-fire-line-intensity raster-map}"
+  "Returns a map of ignition rasters (represented as maps) "
   (fn [config]
     (:fetch-ignition-method config)))
 
 (defmethod initial-ignition-layers :postgis
-  [{:keys [db-spec ignition-layers] :as config}]
-  (reduce
-   (fn [amap ignition-name]
-     (let [table  (ignition-layers ignition-name)
-           matrix (postgis-raster-to-matrix db-spec table)]
-       (assoc amap ignition-name matrix)))
-   {}
-   ignition-names))
+  [{:keys [db-spec ignition-layer] :as config}]
+  (postgis-raster-to-matrix db-spec ignition-layer))
 
 (defmethod initial-ignition-layers :geotiff
-  [{:keys [ignition-layers] :as config}]
-  (reduce
-   (fn [amap ignition-name]
-     (let [geotiff (ignition-layers ignition-name)
-           matrix  (geotiff-raster-to-matrix geotiff)]
-       (assoc amap ignition-name matrix)))
-   {}
-   ignition-names))
+  [{:keys [ignition-layer] :as config}]
+  (geotiff-raster-to-matrix ignition-layer))
 
 (defmethod initial-ignition-layers :default
   [config]
@@ -2926,9 +2902,7 @@ initializing a burn paremeter from reading a raster file from disk.
 
  ;; Section 2: Ignition from which to build simulation inputs
  :fetch-ignition-method     :geotiff
- :ignition-layers           {:initial-fire-spread         "test/gridfire/resources/scar.tif"
-                             :initial-fire-line-intensity "test/gridfire/resources/ifi.tif"
-                             :initial-flame-length        "test/gridfire/resources/ifl.tif"}
+ :ignition-layers           "test/gridfire/resources/scar.tif"
 
  ;; Section 3: Weather data from which to build simulation inputs
  ;; For all options in this section, you may enter values in one of three ways:

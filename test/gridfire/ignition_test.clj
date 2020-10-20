@@ -54,8 +54,7 @@
                            (Random.))
         landfire-layers  (gf/fetch-landfire-layers config)
         landfire-matrix  (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
-        ignition-layers  (fetch/initial-ignition-layers config)
-        ignition-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) ignition-layers)]
+        ignition-raster  (fetch/initial-ignition-layers config)]
     (gf/run-simulations
      simulations
      landfire-matrix
@@ -74,7 +73,7 @@
      (:output-geotiffs? config)
      (:output-pngs? config)
      (:output-csvs? config)
-     ignition-rasters)))
+     ignition-raster)))
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
@@ -82,69 +81,39 @@
 
 (deftest fetch-ignition-layers-test
   (testing "Fetching ignition layers from postgis and geotiff files"
-    (let [geotiff-config (merge test-config-base
-                                {:fetch-ignition-method
-                                 :geotiff
-
-                                 :ignition-layers
-                                 {:initial-fire-spread         (in-file-path "scar.tif")
-                                  :initial-fire-line-intensity (in-file-path "ifi.tif")
-                                  :initial-flame-length        (in-file-path "ifl.tif")}})
-          postgis-config (merge test-config-base
-                                {:fetch-ignition-method
-                                 :postgis
-
-                                 :ignition-layers
-                                 {:initial-fire-spread         "ignition.scar WHERE rid=1"
-                                  :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
-                                  :initial-flame-length        "ignition.ifl WHERE rid=1"}})
+    (let [geotiff-config          (merge test-config-base
+                                         {:fetch-ignition-method :geotiff
+                                          :ignition-layer        (in-file-path "ign.tif")})
+          postgis-config          (merge test-config-base
+                                         {:fetch-ignition-method :postgis
+                                          :ignition-layer        "ignition.ign WHERE rid=1"})
           geotiff-ignition-layers (fetch/initial-ignition-layers postgis-config)
           postgis-ignition-layers (fetch/initial-ignition-layers geotiff-config)]
 
-      (is (= (get-in postgis-ignition-layers [:initial-fire-spread :matrix])
-             (get-in geotiff-ignition-layers [:initial-fire-spread :matrix])))
-
-      (is (= (get-in postgis-ignition-layers [:initial-fire-line-intensity :matrix])
-             (get-in geotiff-ignition-layers [:initial-fire-line-intensity :matrix])))
-
-      (is (= (get-in postgis-ignition-layers [:initial-flame-length :matrix])
-             (get-in geotiff-ignition-layers [:initial-flame-length :matrix]))))))
+      (is (= (:matrix geotiff-ignition-layers)
+             (:matrix postgis-ignition-layers))))))
 
 (deftest omit-ignition-method-test
   (testing "Omitting fetch-igntion-method key in config"
     (let [geotiff-config          (merge test-config-base
-                                         {:ignition-layers
-                                          {:initial-fire-spread         (in-file-path "scar.tif")
-                                           :initial-fire-line-intensity (in-file-path "ifi.tif")
-                                           :initial-flame-length        (in-file-path "ifl.tif")}})
+                                         {:ignition-layer (in-file-path "ign.tif")})
           geotiff-ignition-layers (fetch/initial-ignition-layers geotiff-config)]
 
       (is (nil? geotiff-ignition-layers)))))
 
-
 (deftest geotiff-ignition-test
   (testing "Running simulation with ignition layers read from geotiff files"
     (let [geotiff-config (merge test-config-base
-                                {:fetch-ignition-method
-                                 :geotiff
-
-                                 :ignition-layers
-                                 {:initial-fire-spread         (in-file-path "scar.tif")
-                                  :initial-fire-line-intensity (in-file-path "ifi.tif")
-                                  :initial-flame-length        (in-file-path "ifl.tif")}})
-          results (run-simulation geotiff-config)]
+                                {:fetch-ignition-method :geotiff
+                                 :ignition-layer        (in-file-path "ign.tif")})
+          results        (run-simulation geotiff-config)]
 
       (is (every? some? results)))))
 
 (deftest postgis-ignition-test
   (testing "Running simulation with ignition layers read from geotiff files"
     (let [postgis-config (merge test-config-base
-                                {:fetch-ignition-method
-                                 :postgis
-
-                                 :ignition-layers
-                                 {:initial-fire-spread         "ignition.scar WHERE rid=1"
-                                  :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
-                                  :initial-flame-length        "ignition.ifl WHERE rid=1"}})
+                                {:fetch-ignition-method :postgis
+                                 :ignition-layer        "ignition.ign WHERE rid=1"})
           results (run-simulation postgis-config)]
       (is (every? some? results)))))

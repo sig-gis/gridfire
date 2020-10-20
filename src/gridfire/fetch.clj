@@ -5,38 +5,18 @@
             [magellan.core :as mg]
             [magellan.raster.inspect :as inspect]))
 
-(def ignition-names
-  [:initial-fire-spread
-   :initial-flame-length
-   :initial-fire-line-intensity])
-
 (defmulti initial-ignition-layers
-  "Returns a map of ignition rasters (represented as maps):
-  {:initial-fire-spread         raster-map
-   :initial-flame-length        raster-map
-   :initial-fire-line-intensity raster-map}"
+  "Returns a map of ignition rasters (represented as maps) "
   (fn [config]
     (:fetch-ignition-method config)))
 
 (defmethod initial-ignition-layers :postgis
-  [{:keys [db-spec ignition-layers] :as config}]
-  (reduce
-   (fn [amap ignition-name]
-     (let [table  (ignition-layers ignition-name)
-           matrix (postgis-raster-to-matrix db-spec table)]
-       (assoc amap ignition-name matrix)))
-   {}
-   ignition-names))
+  [{:keys [db-spec ignition-layer] :as config}]
+  (postgis-raster-to-matrix db-spec ignition-layer))
 
 (defmethod initial-ignition-layers :geotiff
-  [{:keys [ignition-layers] :as config}]
-  (reduce
-   (fn [amap ignition-name]
-     (let [geotiff (ignition-layers ignition-name)
-           matrix  (geotiff-raster-to-matrix geotiff)]
-       (assoc amap ignition-name matrix)))
-   {}
-   ignition-names))
+  [{:keys [ignition-layer] :as config}]
+  (geotiff-raster-to-matrix ignition-layer))
 
 (defmethod initial-ignition-layers :default
   [config]

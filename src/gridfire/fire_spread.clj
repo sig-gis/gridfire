@@ -333,26 +333,35 @@
                             initial-ignition-site
                             nil
                             0.0)}]
-       (run-loop (merge
-                  constants
-                  {:initial-ignition-site initial-ignition-site})
-                 ignited-cells
-                 fire-spread-matrix
-                 flame-length-matrix
-                 fire-line-intensity-matrix)))))
+        (run-loop (merge
+                   constants
+                   {:initial-ignition-site initial-ignition-site})
+                  ignited-cells
+                  fire-spread-matrix
+                  flame-length-matrix
+                  fire-line-intensity-matrix)))))
 
-(defn- non-zero-indices [m]
+(defn- initialize-matrix
+  [num-rows num-cols indices]
+  (let [matrix (m/zero-matrix num-rows num-cols)]
+    (doseq [[i j] indices
+            :when (in-bounds? num-rows num-cols [i j])]
+      (m/mset! matrix i j -1))
+    matrix))
+
+(defn- get-non-zero-indices [m]
   (for [[r cols] (map-indexed vector (m/non-zero-indices m))
-        c cols]
+        c        cols]
     [r c]))
 
-(defmethod run-fire-spread clojure.lang.PersistentArrayMap
-  [{:keys [landfire-layers] :as constants} initial-ignition-raster]
-  (let [fire-spread-matrix         (:initial-fire-spread initial-ignition-raster)
-        flame-length-matrix        (:initial-flame-length initial-ignition-raster)
-        fire-line-intensity-matrix (:initial-fire-line-intensity initial-ignition-raster)
+(defmethod run-fire-spread clojure.lang.PersistentHashMap
+  [{:keys [landfire-layers num-rows num-cols] :as constants} initial-ignition-raster]
+  (let [fire-spread-matrix         (:matrix initial-ignition-raster)
+        non-zero-indices           (get-non-zero-indices fire-spread-matrix)
+        flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices)
+        fire-line-intensity-matrix (initialize-matrix num-cols num-cols non-zero-indices)
         ignited-cells              (into {}
-                                         (for [index (non-zero-indices fire-spread-matrix)
+                                         (for [index non-zero-indices
                                                :let  [ignition-trajectories
                                                       (compute-neighborhood-fire-spread-rates!
                                                        constants
