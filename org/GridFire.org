@@ -2868,7 +2868,7 @@ following mappings:
  :ignition-layers       "ignition.scar WHERE rid=1"}
 #+end_src
 
-To initialize a burn paremeter from a raster file on disk include the
+To initialize a burn perimeter from a raster file on disk include the
 following mappings:
 - *fetch-ignition-method*: a keyword to denote which method we want to use
 - *ignition-layers*: a filepath
@@ -3066,7 +3066,7 @@ database and initializing burn points from a range of values.
  #+end_src
 
 Here is a complete sample config for reading landfire-layers from disk and
-initializing a burn paremeter from reading a raster file from disk.
+initializing a burn perimeter from reading a raster file from disk.
 
  #+name: sample_geotiff_config.edn
  #+begin_src clojure :results silent :exports code :tangle ../resources/sample_geotiff_config.edn :padline no :no-expand :comments link
