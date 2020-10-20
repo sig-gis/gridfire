@@ -50,14 +50,13 @@
   (str resources-path filename))
 
 (defn run-simulation [config]
-  (let [simulations      (:simulations config)
-        rand-generator   (if-let [seed (:random-seed config)]
-                           (Random. seed)
-                           (Random.))
-        landfire-layers  (cli/fetch-landfire-layers config)
-        landfire-matrix  (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
-        ignition-layers  (fetch/initial-ignition-layers config)
-        ignition-rasters (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) ignition-layers)]
+  (let [simulations     (:simulations config)
+        rand-generator  (if-let [seed (:random-seed config)]
+                          (Random. seed)
+                          (Random.))
+        landfire-layers (cli/fetch-landfire-layers config)
+        landfire-matrix (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
+        ignition-raster (fetch/initial-ignition-layers config)]
     (cli/run-simulations
      simulations
      landfire-matrix
@@ -76,7 +75,7 @@
      (:output-geotiffs? config)
      (:output-pngs? config)
      (:output-csvs? config)
-     ignition-rasters
+     ignition-raster
      config)))
 
 ;;-----------------------------------------------------------------------------
@@ -178,28 +177,18 @@
 (deftest geotiff-ignition-test
   (testing "Running simulation with ignition layers read from geotiff files"
     (let [geotiff-config (merge test-config-base
-                                {:fetch-ignition-method
-                                 :geotiff
-
-                                 :ignition-layers
-                                 {:initial-fire-spread         (in-file-path "scar.tif")
-                                  :initial-fire-line-intensity (in-file-path "ifi.tif")
-                                  :initial-flame-length        (in-file-path "ifl.tif")}})
-          results (run-simulation geotiff-config)]
+                                {:fetch-ignition-method :geotiff
+                                 :ignition-layer        (in-file-path "ign.tif")})
+          results        (run-simulation geotiff-config)]
 
       (is (every? some? results)))))
 
 (deftest postgis-ignition-test
   (testing "Running simulation with ignition layers read from geotiff files"
     (let [postgis-config (merge test-config-base
-                                {:fetch-ignition-method
-                                 :postgis
-
-                                 :ignition-layers
-                                 {:initial-fire-spread         "ignition.scar WHERE rid=1"
-                                  :initial-fire-line-intensity "ignition.ifi WHERE rid=1"
-                                  :initial-flame-length        "ignition.ifl WHERE rid=1"}})
-          results (run-simulation postgis-config)]
+                                {:fetch-ignition-method :postgis
+                                 :ignition-layer        "ignition.ign WHERE rid=1"})
+          results        (run-simulation postgis-config)]
       (is (every? some? results)))))
 
 ;;-----------------------------------------------------------------------------
@@ -270,9 +259,7 @@
                          {:fetch-layer-method               :geotiff
                           :landfire-layers                  landfire-layers-weather-test
                           :fetch-ignition-method            :geotiff
-                          :ignition-layers                  {:initial-fire-spread         (in-file-path "scar.tif")
-                                                             :initial-fire-line-intensity (in-file-path "ifi.tif")
-                                                             :initial-flame-length        (in-file-path "ifl.tif")}
+                          :ignition-layer                   (in-file-path "ign.tif")
                           :fetch-temperature-method         :geotiff
                           :temperature                      (in-file-path "weather-test/tmpf_to_sample.tif")
                           :fetch-relative-humidity-method   :geotiff
