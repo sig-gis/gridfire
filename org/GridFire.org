@@ -2855,7 +2855,7 @@ For this method of ignition values maybe entered in one of three ways:
  :ignition-col [20 80]}
  #+end_src
 
-To initialize an existing burn perimeter from a raster we have two options. We can
+Gridfire gives us two options for initializing a burn perimeter. We can
 read rasters from a PostGIS database or a raster file on disk.
 
 To initialize a burn perimeter from a raster in our PostGIS database include the
@@ -2979,7 +2979,6 @@ following mappings:
  :temperature              "test/gridfire/resources/weather-test/tmpf_to_sample.tif"}
 #+end_src
 
-To initialize a burn perimeter from a raster file on disk include the
 To use weather raster from a raster file on disk include the
 following mappings:
 - *fetch-<weather-type>-method*: a keyword to denote which method we want to use
