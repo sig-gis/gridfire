@@ -1,0 +1,16 @@
+FIRE_NAME                      = ca-glass
+INITIALIZATION_TIME            = 2020-09-27 11:00 UTC
+IGNITION_LON                   = -122.49745
+IGNITION_LAT                   = 38.56295
+IGNITION_RADIUS                = 300.0
+INITIALIZATION_TYPE            = points_within_polygon
+ELMFIRE_RUN_HOURS              = 72
+NORTH_BUFFER_KM                = 12
+EAST_BUFFER_KM                 = 12
+WEST_BUFFER_KM                 = 12
+SOUTH_BUFFER_KM                = 12
+NUM_ENSEMBLE_MEMBERS           = 1000
+NUM_MPI_PROCESSES              = 64
+USE_SPECIFIC_WX_CYCLE          = no
+SETUP_CALIBRATION_POLYGONS     = no
+SETUP_BARRIER_POLYGONS         = no
