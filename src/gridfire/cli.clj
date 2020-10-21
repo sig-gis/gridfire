@@ -269,14 +269,13 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-(defn get-weather [config rand-generator landfire-raster weather-type]
+(defn get-weather [config rand-generator weather-type]
   (let [val          (config weather-type)
-        fetch-method (keyword (s/join "-" ["fetch" (name weather-type) "method"]))
-        n            (:simulations config)]
+        fetch-method (keyword (s/join "-" ["fetch" (name weather-type) "method"]))]
     (if (contains? config fetch-method)
-      (let [raster (fetch/weather config landfire-raster weather-type)]
+      (let [raster (fetch/weather config weather-type)]
         raster)
-      (draw-samples rand-generator n val))))
+      (draw-samples rand-generator (:simulations config) val))))
 
 (defn -main
   [& config-files]
@@ -304,10 +303,10 @@
             (draw-samples rand-generator simulations (:ignition-row config))
             (draw-samples rand-generator simulations (:ignition-col config))
             (draw-samples rand-generator simulations (:max-runtime config))
-            (get-weather config rand-generator (:elevation landfire-layers) :temperature)
-            (get-weather config rand-generator (:elevation landfire-layers) :relative-humidity)
-            (get-weather config rand-generator (:elevation landfire-layers) :wind-speed-20ft)
-            (get-weather config rand-generator (:elevation landfire-layers) :wind-from-direction)
+            (get-weather config rand-generator :temperature)
+            (get-weather config rand-generator :relative-humidity)
+            (get-weather config rand-generator :wind-speed-20ft)
+            (get-weather config rand-generator :wind-from-direction)
             (draw-samples rand-generator simulations (:foliar-moisture config))
             (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
             (:outfile-suffix config)
