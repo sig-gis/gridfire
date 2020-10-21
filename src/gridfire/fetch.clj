@@ -34,10 +34,7 @@
 
 (defmethod weather :postgis-temperature
   [{:keys [temperature db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband
-            db-spec
-            temperature
-            nil)))
+  (:matrix (postgis-raster-to-matrix-multiband db-spec temperature)))
 
 (defmethod weather :geotiff-temperature
   [{:keys [temperature] :as config} type]
@@ -45,10 +42,7 @@
 
 (defmethod weather :postgis-relative-humidity
   [{:keys [relative-humidity db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband
-            db-spec
-            relative-humidity
-            nil)))
+  (:matrix (postgis-raster-to-matrix-multiband db-spec relative-humidity)))
 
 (defmethod weather :geotiff-relative-humidity
   [{:keys [relative-humidity] :as config} type]
@@ -56,10 +50,7 @@
 
 (defmethod weather :postgis-wind-speed-20ft
   [{:keys [wind-speed-20ft db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband
-            db-spec
-            wind-speed-20ft
-            nil)))
+  (:matrix (postgis-raster-to-matrix-multiband db-spec wind-speed-20ft)))
 
 (defmethod weather :geotiff-wind-speed-20ft
   [{:keys [wind-speed-20ft] :as config} type]
@@ -67,10 +58,7 @@
 
 (defmethod weather :postgis-wind-from-direction
   [{:keys [wind-from-direction db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband
-            db-spec
-            wind-from-direction
-            nil)))
+  (:matrix (postgis-raster-to-matrix-multiband db-spec wind-from-direction)))
 
 (defmethod weather :geotiff-wind-from-direction
   [{:keys [wind-from-direction] :as config} type]
