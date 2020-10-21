@@ -270,16 +270,15 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-(defn get-weather [config name]
-  (let [val (name config)]
-    (if (map? val)
-      (let [raster (fetch/weather name)]
-        (repeat n raster))
-      (let [rand-generator (if-let [seed (:random-seed config)]
-                               (Random. seed)
-                               (Random.))
-            simulations    (:simulations config)]
-        (draw-samples rand-generator simulations val)))))
+
+(defn get-weather [config rand-generator weather-type]
+  (let [val          (config weather-type)
+        fetch-method (keyword (s/join "-" ["fetch" (name weather-type) "method"]))
+        n            (:simulations config)]
+    (if (contains? config fetch-method)
+      (let [raster (fetch/weather config weather-type)]
+        raster)
+      (draw-samples rand-generator n val))))
 
 (defn -main
   [& config-files]
