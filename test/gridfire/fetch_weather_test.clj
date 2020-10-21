@@ -33,9 +33,6 @@
 (defn in-file-path [filename]
   (str resources-path filename))
 
-(def raster-for-resample
-  (mb/geotiff-raster-to-matrix (in-file-path "asp.tif")))
-
 ;;-----------------------------------------------------------------------------
 ;; Tests
 ;;-----------------------------------------------------------------------------
@@ -49,8 +46,8 @@
         postgis-config  (merge test-config-base
                                {:fetch-temperature-method :postgis
                                 :temperature              postgis-table})
-        geotiff-results (fetch/weather geotiff-config raster-for-resample :temperature)
-        postgis-results (fetch/weather postgis-config raster-for-resample :temperature)]
+        geotiff-results (fetch/weather geotiff-config :temperature)
+        postgis-results (fetch/weather postgis-config :temperature)]
 
     (is (every? m/matrix? geotiff-results))
 
@@ -75,8 +72,8 @@
         postgis-config  (merge test-config-base
                                {:fetch-relative-humidity-method :postgis
                                 :relative-humidity              postgis-table})
-        geotiff-results (fetch/weather geotiff-config raster-for-resample :relative-humidity)
-        postgis-results (fetch/weather postgis-config raster-for-resample :relative-humidity)]
+        geotiff-results (fetch/weather geotiff-config :relative-humidity)
+        postgis-results (fetch/weather postgis-config :relative-humidity)]
 
     (is (every? m/matrix? geotiff-results))
 
@@ -101,8 +98,8 @@
         postgis-config  (merge test-config-base
                                {:fetch-wind-speed-20ft-method :postgis
                                 :wind-speed-20ft              postgis-table})
-        geotiff-results (fetch/weather geotiff-config raster-for-resample :wind-speed-20ft)
-        postgis-results (fetch/weather postgis-config raster-for-resample :wind-speed-20ft)]
+        geotiff-results (fetch/weather geotiff-config :wind-speed-20ft)
+        postgis-results (fetch/weather postgis-config :wind-speed-20ft)]
 
     (is (every? m/matrix? geotiff-results))
 
@@ -127,8 +124,8 @@
         postgis-config  (merge test-config-base
                                {:fetch-wind-from-direction-method :postgis
                                 :wind-from-direction              postgis-table})
-        geotiff-results (fetch/weather geotiff-config raster-for-resample :wind-from-direction)
-        postgis-results (fetch/weather postgis-config raster-for-resample :wind-from-direction)]
+        geotiff-results (fetch/weather geotiff-config :wind-from-direction)
+        postgis-results (fetch/weather postgis-config :wind-from-direction)]
 
     (is (every? m/matrix? geotiff-results))
 
@@ -151,7 +148,7 @@
                               {:fetch-wind-from-direction-method :geotiff
                                :wind-from-direction              (in-file-path file)})
         rand-generator (Random. (:random-seed config))
-        results        (cli/get-weather config rand-generator raster-for-resample :wind-from-direction)]
+        results        (cli/get-weather config rand-generator :wind-from-direction)]
 
     (is (vector results))
 
@@ -163,7 +160,7 @@
                               {:fetch-temperature-method :postgis
                                :temperature              table})
         rand-generator (Random. (:random-seed config))
-        results        (cli/get-weather config rand-generator raster-for-resample :temperature)]
+        results        (cli/get-weather config rand-generator :temperature)]
 
     (is (vector results))
 
@@ -174,7 +171,7 @@
                               {:temperature [0 100]
                                :simulations 10})
         rand-generator (Random. (:random-seed config))
-        results        (cli/get-weather config rand-generator raster-for-resample :temperature)]
+        results        (cli/get-weather config rand-generator :temperature)]
 
     (is (vector results))
 
@@ -186,7 +183,7 @@
                               {:temperature tmp-list
                                :simulations 10})
         rand-generator (Random. (:random-seed config))
-        results        (cli/get-weather config rand-generator raster-for-resample :temperature)]
+        results        (cli/get-weather config rand-generator :temperature)]
 
     (is (vector results))
 
@@ -199,7 +196,7 @@
                               {:temperature 42
                                :simulations 10})
         rand-generator (Random. (:random-seed config))
-        results        (cli/get-weather config rand-generator raster-for-resample :temperature)]
+        results        (cli/get-weather config rand-generator :temperature)]
 
     (is (vector results))
 
