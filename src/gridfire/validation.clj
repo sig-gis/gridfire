@@ -23,7 +23,7 @@
   (let [f                      (fn [k] (keyword (s/join "-" ["fetch" (name k) "method"])))
         weather-rasters        (->> weather-names
                                     (select-keys config)
-                                    (filter (fn [[k v]] (map? v))))
+                                    (filter (fn [[k v]] (or (string? v) (map? v)))))
         fetch-keywords         (map f (keys weather-rasters))
         missing-fetch-keywords (->> fetch-keywords
                                     (filter #(not (contains? config %)))

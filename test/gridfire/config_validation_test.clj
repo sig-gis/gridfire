@@ -53,9 +53,18 @@
       (is (some? err)))))
 
 (deftest weather-fetch-method-test
-  (testing "Weather raster input must have accompanying fetch method keyword"
-    (let [config       {:cell-size   800
-                        :temperature {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
+  (testing "Weather raster input (string) must have accompanying fetch method keyword"
+    (let [config       {:temperature (in-file-path "weather-test/tmpf_to_sample.tif")}
+          [result err] (validation/weather-fetch-methods config)]
+
+      (is (nil? result))
+
+      (is (some? err))
+
+      (is (= err "Missing these fetch-<weather>-method keywords: (:fetch-temperature-method)"))))
+
+  (testing "Weather raster input (map) must have accompanying fetch method keyword"
+    (let [config       {:temperature {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
                                       :cell-size 80}}
           [result err] (validation/weather-fetch-methods config)]
 
@@ -63,4 +72,5 @@
 
       (is (some? err))
 
-      (is (= err "Missing these fetch-<weather>-method keywords: (:fetch-temperature-method)")))))
+      (is (= err "Missing these fetch-<weather>-method keywords: (:fetch-temperature-method)"))))
+  )
