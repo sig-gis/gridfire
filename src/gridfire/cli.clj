@@ -11,6 +11,7 @@
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
+            [gridfire.validation :refer [valid-config?]]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
                                    register-new-crs-definitions-from-properties-file!
@@ -277,45 +278,53 @@
         raster)
       (draw-samples rand-generator (:simulations config) val))))
 
+(defn print-error [err config]
+  (prn "CONFIG ERROR for:")
+  (clojure.pprint/pprint config)
+  (prn err))
+
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
     (let [config           (edn/read-string (slurp config-file))
-          landfire-layers  (fetch-landfire-layers config)
-          landfire-rasters (into {}
-                                 (map (fn [[layer info]] [layer (:matrix info)]))
-                                 landfire-layers)
-          ignition-raster  (fetch/initial-ignition-layers config)
-          envelope         (get-envelope config landfire-layers)
-          simulations      (:simulations config)
-          rand-generator   (if-let [seed (:random-seed config)]
-                             (Random. seed)
-                             (Random.))]
-      (when (:output-landfire-inputs? config)
-        (doseq [[layer matrix] landfire-rasters]
-          (-> (matrix-to-raster (name layer) matrix envelope)
-              (write-raster (str (name layer) (:outfile-suffix config) ".tif")))))
-      (->> (run-simulations
-            simulations
-            landfire-rasters
-            envelope
-            (:cell-size config)
-            (draw-samples rand-generator simulations (:ignition-row config))
-            (draw-samples rand-generator simulations (:ignition-col config))
-            (draw-samples rand-generator simulations (:max-runtime config))
-            (get-weather config rand-generator :temperature)
-            (get-weather config rand-generator :relative-humidity)
-            (get-weather config rand-generator :wind-speed-20ft)
-            (get-weather config rand-generator :wind-from-direction)
-            (draw-samples rand-generator simulations (:foliar-moisture config))
-            (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
-            (:outfile-suffix config)
-            (:output-geotiffs? config)
-            (:output-pngs? config)
-            (:output-csvs? config)
-            ignition-raster
-            config)
-           (write-csv-outputs
-            (:output-csvs? config)
-            (str "summary_stats" (:outfile-suffix config) ".csv"))))))
+          [config err]     (valid-config? config)]
+      (if (valid-config? config)
+        (let [landfire-layers  (fetch-landfire-layers config)
+              landfire-rasters (into {}
+                                     (map (fn [[layer info]] [layer (:matrix info)]))
+                                     landfire-layers)
+              ignition-raster  (fetch/initial-ignition-layers config)
+              envelope         (get-envelope config landfire-layers)
+              simulations      (:simulations config)
+              rand-generator   (if-let [seed (:random-seed config)]
+                                 (Random. seed)
+                                 (Random.))]
+          (when (:output-landfire-inputs? config)
+            (doseq [[layer matrix] landfire-rasters]
+              (-> (matrix-to-raster (name layer) matrix envelope)
+                  (write-raster (str (name layer) (:outfile-suffix config) ".tif")))))
+          (->> (run-simulations
+                simulations
+                landfire-rasters
+                envelope
+                (:cell-size config)
+                (draw-samples rand-generator simulations (:ignition-row config))
+                (draw-samples rand-generator simulations (:ignition-col config))
+                (draw-samples rand-generator simulations (:max-runtime config))
+                (get-weather config rand-generator :temperature)
+                (get-weather config rand-generator :relative-humidity)
+                (get-weather config rand-generator :wind-speed-20ft)
+                (get-weather config rand-generator :wind-from-direction)
+                (draw-samples rand-generator simulations (:foliar-moisture config))
+                (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
+                (:outfile-suffix config)
+                (:output-geotiffs? config)
+                (:output-pngs? config)
+                (:output-csvs? config)
+                ignition-raster
+                config)
+               (write-csv-outputs
+                (:output-csvs? config)
+                (str "summary_stats" (:outfile-suffix config) ".csv"))))
+        (print-error err config)))))
 ;; command-line-interface ends here
