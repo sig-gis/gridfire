@@ -288,7 +288,7 @@
   (doseq [config-file config-files]
     (let [config           (edn/read-string (slurp config-file))
           [config err]     (valid-config? config)]
-      (if (valid-config? config)
+      (if config
         (let [landfire-layers  (fetch-landfire-layers config)
               landfire-rasters (into {}
                                      (map (fn [[layer info]] [layer (:matrix info)]))
