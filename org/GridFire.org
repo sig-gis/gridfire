@@ -106,7 +106,8 @@ complete deps.edn is shown below.
         net.mikera/vectorz-clj              {:mvn/version "0.48.0"}
                                             ;;TODO Point to new magellan once it is deployed
         sig-gis/magellan                    {:local/root "../magellan/target/magellan-20200909.105353.jar"}
-        org.clojars.lambdatronic/matrix-viz {:mvn/version "0.1.7"}}
+        org.clojars.lambdatronic/matrix-viz {:mvn/version "0.1.7"}
+        cider/cider-nrepl                   {:mvn/version "0.25.3"}}
 
  :mvn/repos {"osgeo" {:url "https://repo.osgeo.org/repository/release/"}}
 
@@ -2246,8 +2247,8 @@ command line interface.
        .getValue
        read-string
        second
-       (clojure.string/replace #"\{" "[")
-       (clojure.string/replace #"\}" "]")
+       (#(clojure.string/replace % #"\{" "["))
+       (#(clojure.string/replace % #"\}" "]"))
        read-string
        (m/emap #(or % -1.0))
        m/matrix))
@@ -2702,15 +2703,6 @@ or false:
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-<<<<<<< HEAD
-=======
-(defn get-ignition-rasters [layers]
-  (let [ignition-rasters (into {}
-                               (map (fn [[layer-name info]] [layer-name (:matrix info)]))
-                               layers)]
-    (if (seq ignition-rasters)
-      ignition-rasters
-      nil)))
 
 (defn get-weather [config rand-generator weather-type]
   (let [val          (config weather-type)
@@ -2718,10 +2710,9 @@ or false:
         n            (:simulations config)]
     (if (contains? config fetch-method)
       (let [raster (fetch/weather config weather-type)]
-        (into [] (repeat n raster)))
+        raster)
       (draw-samples rand-generator n val))))
 
->>>>>>> read weather data from disk and geotiff, tested
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
@@ -3051,7 +3042,7 @@ database and initializing burn points from a range of values.
  :foliar-moisture           90             ;; (%)
  :ellipse-adjustment-factor 1.0            ;; (< 1.0 = more circular, > 1.0 = more elliptical)
 
- ;; Section 4: Number of simulations and (optional) random seed perimeter
+ ;; Section 4: Number of simulations and (optional) random seed parameter
  :simulations               10
  :random-seed               1234567890     ;; long value (optional)
 
@@ -3104,7 +3095,7 @@ initializing a burn perimeter from reading a raster file from disk.
  :foliar-moisture           90             ;; (%)
  :ellipse-adjustment-factor 1.0            ;; (< 1.0 = more circular, > 1.0 = more elliptical)
 
- ;; Section 3: Number of simulations and (optional) random seed perimeter
+ ;; Section 3: Number of simulations and (optional) random seed parameter
  :simulations               10
  :random-seed               1234567890     ;; long value (optional)
 
