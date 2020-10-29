@@ -1915,16 +1915,23 @@ pseudo-code lays out the steps taken in this procedure:
      30))
 
 (defn sample-at
-  [[i j] global-clock raster]
-  (let [band (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
+  [here global-clock raster multiplier]
+  (let [[i j] (map #(quot % (or multiplier 1)) here)
+        band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
     (m/mget raster band i j)))
 
-(defn fuel-moisture [here temperature relative-humidity global-clock]
+(defn fuel-moisture [here temperature relative-humidity global-clock multiplier-lookup]
   (let [tmp                  (if (v/vectorz? temperature)
-                               (sample-at here global-clock temperature)
+                               (sample-at here
+                                          global-clock
+                                          temperature
+                                          (:temperature multiplier-lookup))
                                temperature)
         rh                   (if (v/vectorz? relative-humidity)
-                               (sample-at here global-clock relative-humidity)
+                               (sample-at here
+                                          global-clock
+                                          relative-humidity
+                                          (:relative-humidity multiplier-lookup))
                                relative-humidity)
         equilibrium-moisture (calc-emc rh tmp)]
     {:dead {:1hr   (+ equilibrium-moisture 0.002)
@@ -1946,19 +1953,26 @@ pseudo-code lays out the steps taken in this procedure:
            ellipse-adjustment-factor
            cell-size
            num-rows
-           num-cols]}
+           num-cols
+           multiplier-lookup]}
    fire-spread-matrix
    [i j :as here]
    overflow-trajectory
    overflow-heat
    global-clock]
   (let [wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
-                              (sample-at here global-clock wind-speed-20ft)
+                              (sample-at here
+                                         global-clock
+                                         wind-speed-20ft
+                                         (:wind-speed-20ft multiplier-lookup))
                               wind-speed-20ft)
         wind-from-direction (if (v/vectorz? wind-from-direction)
-                              (sample-at here global-clock wind-from-direction)
+                              (sample-at here
+                                         global-clock
+                                         wind-from-direction
+                                         (:wind-from-direction multiplier-lookup))
                               wind-from-direction)
-        fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock)
+        fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock multiplier-lookup)
         fuel-model-number   (m/mget (:fuel-model         landfire-layers) i j)
         slope               (m/mget (:slope              landfire-layers) i j)
         aspect              (m/mget (:aspect             landfire-layers) i j)
@@ -2490,6 +2504,7 @@ or false:
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
+            [gridfire.validation :refer [valid-config? weather-names]]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
                                    register-new-crs-definitions-from-properties-file!
@@ -2643,19 +2658,26 @@ or false:
     (/ (* eta (Math/sqrt (+ 1 (Math/pow (* x wsp) 2))))
        0.3002)))
 
+
+
 (defn run-simulations
-  [simulations landfire-rasters envelope cell-size ignition-row
+  [{:keys
+    [cell-size outfile-suffix output-geotiffs? output-pngs? output-csvs?
+     fetch-temperature-method fetch-wind-speed-20ft-method
+     fetch-wind-from-direction-method fetch-relative-humidity-method
+     simulations] :as config}
+   landfire-rasters envelope ignition-row
    ignition-col max-runtime temperature relative-humidity wind-speed-20ft
-   wind-from-direction foliar-moisture ellipse-adjustment-factor
-   outfile-suffix output-geotiffs? output-pngs? output-csvs? ignition-raster config]
+   wind-from-direction foliar-moisture ellipse-adjustment-factor ignition-raster
+   multiplier-lookup]
   (mapv
    (fn [i]
      (let [initial-ignition-site (or ignition-raster
                                      [(ignition-row i) (ignition-col i)])
-           temperature           (if (config :fetch-temperature-method) temperature (temperature i))
-           wind-speed-20ft       (if (config :fetch-wind-speed-20ft-method) wind-speed-20ft (wind-speed-20ft i))
-           wind-from-direction   (if (config :fetch-wind-from-direction-method) wind-from-direction (wind-from-direction i))
-           relative-humidity     (if (config :fetch-relative-humidity-method) relative-humidity (relative-humidity i))]
+           temperature           (if fetch-temperature-method temperature (temperature i))
+           wind-speed-20ft       (if fetch-wind-speed-20ft-method wind-speed-20ft (wind-speed-20ft i))
+           wind-from-direction   (if fetch-wind-from-direction-method wind-from-direction (wind-from-direction i))
+           relative-humidity     (if fetch-relative-humidity-method relative-humidity (relative-humidity i))]
        (if-let [fire-spread-results (run-fire-spread
                                      {:max-runtime               (max-runtime i)
                                       :cell-size                 cell-size
@@ -2667,7 +2689,8 @@ or false:
                                       :foliar-moisture           (* 0.01 (foliar-moisture i))
                                       :ellipse-adjustment-factor (ellipse-adjustment-factor i)
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
-                                      :num-cols                  (m/row-count (:fuel-model landfire-rasters))}
+                                      :num-cols                  (m/row-count (:fuel-model landfire-rasters))
+                                      :multiplier-lookup         multiplier-lookup}
                                      initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
@@ -2756,47 +2779,62 @@ or false:
         raster)
       (draw-samples rand-generator (:simulations config) val))))
 
+(defn create-multiplier-lookup
+  [{:keys [cell-size] :as config}]
+  (let [weather-keys (->> weather-names
+                          (select-keys config)
+                          (filter (fn [[k v]] (map? v)))
+                          keys)]
+    (reduce (fn [acc k]
+              (assoc acc k (quot cell-size (get-in config [k :cell-size]))))
+            {}
+            weather-keys)))
+
+(defn print-error [err config]
+  (prn "CONFIG ERROR for:")
+  (clojure.pprint/pprint config)
+  (prn err))
+
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
-    (let [config           (edn/read-string (slurp config-file))
-          landfire-layers  (fetch-landfire-layers config)
-          landfire-rasters (into {}
-                                 (map (fn [[layer info]] [layer (:matrix info)]))
-                                 landfire-layers)
-          ignition-raster  (fetch/initial-ignition-layers config)
-          envelope         (get-envelope config landfire-layers)
-          simulations      (:simulations config)
-          rand-generator   (if-let [seed (:random-seed config)]
-                             (Random. seed)
-                             (Random.))]
-      (when (:output-landfire-inputs? config)
-        (doseq [[layer matrix] landfire-rasters]
-          (-> (matrix-to-raster (name layer) matrix envelope)
-              (write-raster (str (name layer) (:outfile-suffix config) ".tif")))))
-      (->> (run-simulations
-            simulations
-            landfire-rasters
-            envelope
-            (:cell-size config)
-            (draw-samples rand-generator simulations (:ignition-row config))
-            (draw-samples rand-generator simulations (:ignition-col config))
-            (draw-samples rand-generator simulations (:max-runtime config))
-            (get-weather config rand-generator :temperature)
-            (get-weather config rand-generator :relative-humidity)
-            (get-weather config rand-generator :wind-speed-20ft)
-            (get-weather config rand-generator :wind-from-direction)
-            (draw-samples rand-generator simulations (:foliar-moisture config))
-            (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
-            (:outfile-suffix config)
-            (:output-geotiffs? config)
-            (:output-pngs? config)
-            (:output-csvs? config)
-            ignition-raster
-            config)
-           (write-csv-outputs
-            (:output-csvs? config)
-            (str "summary_stats" (:outfile-suffix config) ".csv"))))))
+    (let [config       (edn/read-string (slurp config-file))
+          [config err] (valid-config? config)]
+      (if config
+        (let [multiplier-lookup (create-multiplier-lookup config)
+              landfire-layers   (fetch-landfire-layers config)
+              landfire-rasters  (into {}
+                                     (map (fn [[layer info]] [layer (:matrix info)]))
+                                     landfire-layers)
+              ignition-raster   (fetch/initial-ignition-layers config)
+              envelope          (get-envelope config landfire-layers)
+              simulations       (:simulations config)
+              rand-generator    (if-let [seed (:random-seed config)]
+                                 (Random. seed)
+                                 (Random.))]
+          (when (:output-landfire-inputs? config)
+            (doseq [[layer matrix] landfire-rasters]
+              (-> (matrix-to-raster (name layer) matrix envelope)
+                  (write-raster (str (name layer) (:outfile-suffix config) ".tif")))))
+          (->> (run-simulations
+                config
+                landfire-rasters
+                envelope
+                (draw-samples rand-generator simulations (:ignition-row config))
+                (draw-samples rand-generator simulations (:ignition-col config))
+                (draw-samples rand-generator simulations (:max-runtime config))
+                (get-weather config rand-generator :temperature)
+                (get-weather config rand-generator :relative-humidity)
+                (get-weather config rand-generator :wind-speed-20ft)
+                (get-weather config rand-generator :wind-from-direction)
+                (draw-samples rand-generator simulations (:foliar-moisture config))
+                (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
+                ignition-raster
+                multiplier-lookup)
+               (write-csv-outputs
+                (:output-csvs? config)
+                (str "summary_stats" (:outfile-suffix config) ".csv"))))
+        (print-error err config)))))
 #+end_src
 
 * Configuration file
@@ -2953,35 +2991,43 @@ this functionality.
 
 (defmethod weather :postgis-temperature
   [{:keys [temperature db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec temperature)))
+  (let [path (if (map? temperature) (:path temperature) temperature)]
+    (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-temperature
   [{:keys [temperature] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband temperature)))
+  (let [path (if (map? temperature) (:path temperature) temperature)]
+   (:matrix (geotiff-raster-to-matrix-multiband path))))
 
 (defmethod weather :postgis-relative-humidity
   [{:keys [relative-humidity db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec relative-humidity)))
+  (let [path (if (map? relative-humidity) (:path relative-humidity) relative-humidity)]
+   (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-relative-humidity
   [{:keys [relative-humidity] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband relative-humidity)))
+  (let [path (if (map? relative-humidity) (:path relative-humidity) relative-humidity)]
+   (:matrix (geotiff-raster-to-matrix-multiband path))))
 
 (defmethod weather :postgis-wind-speed-20ft
   [{:keys [wind-speed-20ft db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec wind-speed-20ft)))
+  (let [path (if (map? wind-speed-20ft) (:path wind-speed-20ft) wind-speed-20ft)]
+   (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-wind-speed-20ft
   [{:keys [wind-speed-20ft] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband wind-speed-20ft)))
+  (let [path (if (map? wind-speed-20ft) (:path wind-speed-20ft) wind-speed-20ft)]
+      (:matrix (geotiff-raster-to-matrix-multiband path))))
 
 (defmethod weather :postgis-wind-from-direction
   [{:keys [wind-from-direction db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec wind-from-direction)))
+  (let [path (if (map? wind-from-direction) (:path wind-from-direction) wind-from-direction)]
+      (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-wind-from-direction
   [{:keys [wind-from-direction] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband wind-from-direction)))
+  (let [path (if (map? wind-from-direction) (:path wind-from-direction) wind-from-direction)]
+    (:matrix (geotiff-raster-to-matrix-multiband path))))
 #+end_src
 ** Section 3: Weather data from which to build simulation inputs
 
@@ -3007,21 +3053,38 @@ PostGIS database or a raster file on disk.
 To use weather raster in our PostGIS database include the
 following mappings:
 - *fetch-<weather-type>-method*: a keyword to denote which method we want to use
-- *<weather-type>*: a mapping of layer names to a partial sql statement
+- *<weather-type>*: a map of location and additional options
 
 #+begin_src clojure
 {:fetch-temperature-method :postgis
- :temperature              "test/gridfire/resources/weather-test/tmpf_to_sample.tif"}
+ :temperature              {:path "weather.tmpf WHERE rid=1"}}
 #+end_src
 
 To use weather raster from a raster file on disk include the
 following mappings:
 - *fetch-<weather-type>-method*: a keyword to denote which method we want to use
-- *<weather-type>*: a mapping of layer names to file paths
+- *<weather-type>*: a map of location and additional options
 
 #+begin_src clojure
 {:fetch-temperature-method :geotiff
- :temperature              "test/gridfire/resources/weather-test/tmpf_to_sample.tif"}
+ :temperature              {:path "test/gridfire/resources/weather-test/tmpf_to_sample.tif"}}
+#+end_src
+
+Gridfire expects weather rasters to have the same resolution as designated by the
+`:cell-size` configuration value. However to improve performance Gridfire
+optionally supports the use of weather rasters with a lower resolution.
+
+To use weather raster with lower resolution than the simulation `:cell-size` include
+the following key value pair in the location map:
+- *cell-size*: integer
+
+*Note:* cell-size of all weather rasters and the simulation's cell-size must be
+multiples of one another.
+
+#+begin_src clojure
+{:fetch-temperature-method :geotiff
+ :temperature              {:path      "test/gridfire/resources/weather-test/tmpf_to_sample.tif"
+                            :cell-size 80}}
 #+end_src
 
 ** Section 4: Number of simulations and (optional) random seed perimeter

@@ -50,18 +50,18 @@
   (str resources-path filename))
 
 (defn run-simulation [config]
-  (let [simulations     (:simulations config)
-        rand-generator  (if-let [seed (:random-seed config)]
+  (let [simulations       (:simulations config)
+        multiplier-lookup (cli/create-multiplier-lookup config)
+        rand-generator    (if-let [seed (:random-seed config)]
                           (Random. seed)
                           (Random.))
-        landfire-layers (cli/fetch-landfire-layers config)
-        landfire-matrix (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
-        ignition-raster (fetch/initial-ignition-layers config)]
+        landfire-layers   (cli/fetch-landfire-layers config)
+        landfire-matrix   (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
+        ignition-raster   (fetch/initial-ignition-layers config)]
     (cli/run-simulations
-     simulations
+     config
      landfire-matrix
      (cli/get-envelope config landfire-layers)
-     (:cell-size config)
      (cli/draw-samples rand-generator simulations (:ignition-row config))
      (cli/draw-samples rand-generator simulations (:ignition-col config))
      (cli/draw-samples rand-generator simulations (:max-runtime config))
@@ -71,12 +71,8 @@
      (cli/get-weather config rand-generator :wind-from-direction)
      (cli/draw-samples rand-generator simulations (:foliar-moisture config))
      (cli/draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
-     (:outfile-suffix config)
-     (:output-geotiffs? config)
-     (:output-pngs? config)
-     (:output-csvs? config)
      ignition-raster
-     config)))
+     multiplier-lookup)))
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
@@ -272,3 +268,37 @@
           results (run-simulation config)]
 
       (is (every? some? results)))))
+
+(deftest run-simulation-using-lower-resolution-weather-test
+  (testing "Running simulation using temperature data from geotiff file"
+    (let [config  (merge test-config-base
+                         {:cell-size                800
+                          :fetch-layer-method       :geotiff
+                          :landfire-layers          landfire-layers-weather-test
+                          :fetch-temperature-method :geotiff
+                          :temperature              {:path      (in-file-path "weather-test/tmpf_to_sample_lower_res.tif")
+                                                     :cell-size 80}})
+          results (run-simulation config)]
+
+      (is (every? some? results)))))
+
+(deftest multiplier-lookup-test
+  (testing "constructing multiplier lookup for weather rasters"
+    (testing "with single weather raster"
+      (let [config {:cell-size   800
+                    :temperature {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
+                                  :cell-size 80}}
+            lookup (cli/create-multiplier-lookup config)]
+
+        (is (= {:temperature 10} lookup))))
+
+    (testing "with multiple weather rasters"
+      (let [config {:cell-size         800
+                    :temperature       {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
+                                        :cell-size 80}
+                    :relative-humidity {:path      (in-file-path "/weather-test/rh_to_sample_lower_res.tif")
+                                        :cell-size 80}}
+            lookup (cli/create-multiplier-lookup config)]
+
+        (is (= {:temperature       10
+                :relative-humidity 10} lookup))))))

@@ -147,16 +147,23 @@
      30))
 
 (defn sample-at
-  [[i j] global-clock raster]
-  (let [band (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
+  [here global-clock raster multiplier]
+  (let [[i j] (map #(quot % (or multiplier 1)) here)
+        band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
     (m/mget raster band i j)))
 
-(defn fuel-moisture [here temperature relative-humidity global-clock]
+(defn fuel-moisture [here temperature relative-humidity global-clock multiplier-lookup]
   (let [tmp                  (if (v/vectorz? temperature)
-                               (sample-at here global-clock temperature)
+                               (sample-at here
+                                          global-clock
+                                          temperature
+                                          (:temperature multiplier-lookup))
                                temperature)
         rh                   (if (v/vectorz? relative-humidity)
-                               (sample-at here global-clock relative-humidity)
+                               (sample-at here
+                                          global-clock
+                                          relative-humidity
+                                          (:relative-humidity multiplier-lookup))
                                relative-humidity)
         equilibrium-moisture (calc-emc rh tmp)]
     {:dead {:1hr   (+ equilibrium-moisture 0.002)
@@ -178,19 +185,26 @@
            ellipse-adjustment-factor
            cell-size
            num-rows
-           num-cols]}
+           num-cols
+           multiplier-lookup]}
    fire-spread-matrix
    [i j :as here]
    overflow-trajectory
    overflow-heat
    global-clock]
   (let [wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
-                              (sample-at here global-clock wind-speed-20ft)
+                              (sample-at here
+                                         global-clock
+                                         wind-speed-20ft
+                                         (:wind-speed-20ft multiplier-lookup))
                               wind-speed-20ft)
         wind-from-direction (if (v/vectorz? wind-from-direction)
-                              (sample-at here global-clock wind-from-direction)
+                              (sample-at here
+                                         global-clock
+                                         wind-from-direction
+                                         (:wind-from-direction multiplier-lookup))
                               wind-from-direction)
-        fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock)
+        fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock multiplier-lookup)
         fuel-model-number   (m/mget (:fuel-model         landfire-layers) i j)
         slope               (m/mget (:slope              landfire-layers) i j)
         aspect              (m/mget (:aspect             landfire-layers) i j)
