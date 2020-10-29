@@ -34,33 +34,41 @@
 
 (defmethod weather :postgis-temperature
   [{:keys [temperature db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec temperature)))
+  (let [path (if (map? temperature) (:path temperature) temperature)]
+    (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-temperature
   [{:keys [temperature] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband temperature)))
+  (let [path (if (map? temperature) (:path temperature) temperature)]
+   (:matrix (geotiff-raster-to-matrix-multiband path))))
 
 (defmethod weather :postgis-relative-humidity
   [{:keys [relative-humidity db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec relative-humidity)))
+  (let [path (if (map? relative-humidity) (:path relative-humidity) relative-humidity)]
+   (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-relative-humidity
   [{:keys [relative-humidity] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband relative-humidity)))
+  (let [path (if (map? relative-humidity) (:path relative-humidity) relative-humidity)]
+   (:matrix (geotiff-raster-to-matrix-multiband path))))
 
 (defmethod weather :postgis-wind-speed-20ft
   [{:keys [wind-speed-20ft db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec wind-speed-20ft)))
+  (let [path (if (map? wind-speed-20ft) (:path wind-speed-20ft) wind-speed-20ft)]
+   (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-wind-speed-20ft
   [{:keys [wind-speed-20ft] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband wind-speed-20ft)))
+  (let [path (if (map? wind-speed-20ft) (:path wind-speed-20ft) wind-speed-20ft)]
+      (:matrix (geotiff-raster-to-matrix-multiband path))))
 
 (defmethod weather :postgis-wind-from-direction
   [{:keys [wind-from-direction db-spec] :as config} type]
-  (:matrix (postgis-raster-to-matrix-multiband db-spec wind-from-direction)))
+  (let [path (if (map? wind-from-direction) (:path wind-from-direction) wind-from-direction)]
+      (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
 
 (defmethod weather :geotiff-wind-from-direction
   [{:keys [wind-from-direction] :as config} type]
-  (:matrix (geotiff-raster-to-matrix-multiband wind-from-direction)))
+  (let [path (if (map? wind-from-direction) (:path wind-from-direction) wind-from-direction)]
+    (:matrix (geotiff-raster-to-matrix-multiband path))))
 ;; Section 2: Ignition from which to build simulation inputs:4 ends here
