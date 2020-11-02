@@ -32,7 +32,7 @@
            STOCHASTIC_TMP_FILENAME STOCHASTIC_RH_FILENAME STOCHASTIC_WS_FILENAME
            STOCHASTIC_WD_FILENAME FOLIAR_MOISTURE_CONTENT FOLIAR_MOISTURE_CONTENT
            SEED]}
-   {:keys [verbose?]}]
+   {:keys [verbose]}]
   (let [dir FUELS_AND_TOPOGRAPHY_DIRECTORY]
     {:fetch-layer-method        :geotiff
      :landfire-layers           {:aspect             (file-path dir ASP_FILENAME)
@@ -58,8 +58,8 @@
      :outfile-suffix            ""
      :output-landfire-inputs?   false
      :output-geotiffs?          false
-     :output-pngs?              verbose?
-     :output-csvs?              verbose?}))
+     :output-pngs?              (if verbose true false)
+     :output-csvs?              (if verbose true false)}))
 
 (defn write-config [config-params]
   (let [file "gridfire-config.edn"]
@@ -73,7 +73,7 @@
 
 (def cli-options
   [["-c" "--config-file FILE" "Path to an data file containing a map of simulation configs"]
-   ["-v" "--verbose?" "Flag for controlling outputs"]])
+   ["-v" "--verbose" "Flag for controlling outputs"]])
 
 (defn -main
   [& args]
