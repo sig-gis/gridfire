@@ -151,7 +151,7 @@
   (let [[i j] (if multiplier
                 (map #(quot % (or multiplier 1)) here)
                 here)
-        band  (quot global-clock 60.0)] ;; Assuming each band is 1 hour
+        band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
     (m/mget raster band i j)))
 
 (defn fuel-moisture [here temperature relative-humidity global-clock multiplier-lookup]
