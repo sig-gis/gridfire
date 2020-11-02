@@ -3078,7 +3078,7 @@ optionally supports the use of weather rasters with a lower resolution.
 
 To use weather raster with lower resolution than the simulation `:cell-size` include
 the following key value pair in the location map:
-- *cell-size*: integer
+- *cell-size*: integer (units feet)
 
 *Note:* cell-size of all weather rasters and the simulation's cell-size must be
 multiples of one another.
@@ -3086,7 +3086,7 @@ multiples of one another.
 #+begin_src clojure
 {:fetch-temperature-method :geotiff
  :temperature              {:path      "test/gridfire/resources/weather-test/tmpf_to_sample.tif"
-                            :cell-size 80}}
+                            :cell-size 98.425}}
 #+end_src
 
 ** Section 4: Number of simulations and (optional) random seed perimeter
