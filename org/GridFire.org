@@ -104,10 +104,11 @@ complete deps.edn is shown below.
         org.postgresql/postgresql           {:mvn/version "42.2.16"}
         net.mikera/core.matrix              {:mvn/version "0.62.0"}
         net.mikera/vectorz-clj              {:mvn/version "0.48.0"}
-                                            ;;TODO Point to new magellan once it is deployed
+        ;;TODO Point to new magellan once it is deployed
         sig-gis/magellan                    {:local/root "../magellan/target/magellan-20200909.105353.jar"}
         org.clojars.lambdatronic/matrix-viz {:mvn/version "0.1.7"}
-        cider/cider-nrepl                   {:mvn/version "0.25.3"}}
+        cider/cider-nrepl                   {:mvn/version "0.25.3"}
+        org.clojure/tools.cli               {:mvn/version "1.0.194"}}
 
  :mvn/repos {"osgeo" {:url "https://repo.osgeo.org/repository/release/"}}
 
@@ -119,6 +120,7 @@ complete deps.edn is shown below.
                                        "-e" "(require,'gridfire.cli)"
                                        "-e" "(in-ns,'gridfire.cli)"
                                        "-r"]}
+           :make-config   {:main-opts ["-m" "gridfire.config"]}
            :make-uberjar  {:extra-deps {seancorfield/depstar {:mvn/version "1.0.97"}}
                            :main-opts  ["-m" "hf.depstar.uberjar" "target/gridfire-20200909.105353.jar"
                                         "-C" "-m" "gridfire.cli"]}
