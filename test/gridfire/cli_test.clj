@@ -285,19 +285,19 @@
 (deftest multiplier-lookup-test
   (testing "constructing multiplier lookup for weather rasters"
     (testing "with single weather raster"
-      (let [config {:cell-size   800
+      (let [config {:cell-size   30
                     :temperature {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
-                                  :cell-size 80}}
+                                  :cell-size 300}}
             lookup (cli/create-multiplier-lookup config)]
 
         (is (= {:temperature 10} lookup))))
 
     (testing "with multiple weather rasters"
-      (let [config {:cell-size         800
+      (let [config {:cell-size         30
                     :temperature       {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
-                                        :cell-size 80}
+                                        :cell-size 300}
                     :relative-humidity {:path      (in-file-path "/weather-test/rh_to_sample_lower_res.tif")
-                                        :cell-size 80}}
+                                        :cell-size 300}}
             lookup (cli/create-multiplier-lookup config)]
 
         (is (= {:temperature       10
