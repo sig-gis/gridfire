@@ -149,7 +149,7 @@
 (defn sample-at
   [here global-clock raster multiplier]
   (let [[i j] (if multiplier
-                (map #(quot % (or multiplier 1)) here)
+                (map #(quot % multiplier) here)
                 here)
         band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
     (m/mget raster band i j)))
