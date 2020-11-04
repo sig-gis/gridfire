@@ -5,13 +5,14 @@
             [clojure.data.csv :as csv]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.string :as s]
+            [clojure.string :as str]
+            [clojure.spec.alpha :as s]
             [gridfire.fetch :as fetch]
             [gridfire.fire-spread :refer [run-fire-spread]]
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
-            [gridfire.validation :refer [valid-config?]]
+            [gridfire.validation :as validation]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
                                    register-new-crs-definitions-from-properties-file!
@@ -272,7 +273,7 @@
 
 (defn get-weather [config rand-generator weather-type]
   (let [val          (config weather-type)
-        fetch-method (keyword (s/join "-" ["fetch" (name weather-type) "method"]))]
+        fetch-method (keyword (str/join "-" ["fetch" (name weather-type) "method"]))]
     (if (contains? config fetch-method)
       (let [raster (fetch/weather config weather-type)]
         raster)
@@ -286,9 +287,8 @@
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
-    (let [config           (edn/read-string (slurp config-file))
-          [config err]     (valid-config? config)]
-      (if config
+    (let [config (edn/read-string (slurp config-file))]
+      (if (s/valid? ::validation/config config)
         (let [landfire-layers  (fetch-landfire-layers config)
               landfire-rasters (into {}
                                      (map (fn [[layer info]] [layer (:matrix info)]))
@@ -326,5 +326,5 @@
                (write-csv-outputs
                 (:output-csvs? config)
                 (str "summary_stats" (:outfile-suffix config) ".csv"))))
-        (print-error err config)))))
+        (s/explain ::validation/config config)))))
 ;; command-line-interface ends here
