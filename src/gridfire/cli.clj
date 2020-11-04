@@ -289,12 +289,14 @@
 
 (defn create-multiplier-lookup
   [{:keys [cell-size] :as config}]
-  (let [weather-keys (->> weather-names
+  (let [weather-keys (->> validation/weather-names
                           (select-keys config)
                           (filter (fn [[k v]] (map? v)))
                           keys)]
     (reduce (fn [acc k]
-              (assoc acc k (quot cell-size (get-in config [k :cell-size]))))
+              (assoc acc k (int (quot
+                                 (get-in config [k :cell-size])
+                                 cell-size))))
             {}
             weather-keys)))
 
@@ -309,16 +311,16 @@
     (let [config (edn/read-string (slurp config-file))]
       (if (s/valid? ::validation/config config)
         (let [multiplier-lookup (create-multiplier-lookup config)
-              landfire-layers  (fetch-landfire-layers config)
-              landfire-rasters (into {}
-                                     (map (fn [[layer info]] [layer (:matrix info)]))
-                                     landfire-layers)
+              landfire-layers   (fetch-landfire-layers config)
+              landfire-rasters  (into {}
+                                      (map (fn [[layer info]] [layer (:matrix info)]))
+                                      landfire-layers)
               ignition-raster   (fetch/initial-ignition-layers config)
               envelope          (get-envelope config landfire-layers)
               simulations       (:simulations config)
               rand-generator    (if-let [seed (:random-seed config)]
-                                 (Random. seed)
-                                 (Random.))]
+                                  (Random. seed)
+                                  (Random.))]
           (when (:output-landfire-inputs? config)
             (doseq [[layer matrix] landfire-rasters]
               (-> (matrix-to-raster (name layer) matrix envelope)
