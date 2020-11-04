@@ -3059,7 +3059,7 @@ following mappings:
 
 #+begin_src clojure
 {:fetch-temperature-method :postgis
- :temperature              {:path "weather.tmpf WHERE rid=1"}}
+ :temperature              {:sql "weather.tmpf WHERE rid=1"}}
 #+end_src
 
 To use weather raster from a raster file on disk include the
