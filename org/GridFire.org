@@ -2900,7 +2900,7 @@ initializing a burn paremeter from reading a raster file from disk.
 
  ;; Section 2: Ignition from which to build simulation inputs
  :fetch-ignition-method     :geotiff
- :ignition-layers           "test/gridfire/resources/scar.tif"
+ :ignition-layer            "test/gridfire/resources/ign.tif"
 
  ;; Section 3: Weather data from which to build simulation inputs
  ;; For all options in this section, you may enter values in one of three ways:
