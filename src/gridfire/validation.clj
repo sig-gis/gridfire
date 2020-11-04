@@ -100,22 +100,3 @@
    ::weather-layers
    #(weather-cell-size-correct-multiples? %)
    #(weather-fetch-methods %)))
-
-;; Testing
-#_(s/explain ::config {:cell-size                        98.425
-                     :landfire-layers                  {:aspect             "test/gridfire/resources/asp.tif"
-                                                        :canopy-base-height "test/gridfire/resources/cbh.tif"
-                                                        :canopy-cover       "test/gridfire/resources/cc.tif"
-                                                        :canopy-height      "test/gridfire/resources/ch.tif"
-                                                        :crown-bulk-density "test/gridfire/resources/cbd.tif"
-                                                        :elevation          "test/gridfire/resources/dem.tif"
-                                                        :fuel-model         "test/gridfire/resources/fbfm40.tif"
-                                                        :slope              "test/gridfire/resources/slp.tif"}
-                     :fetch-temperature-method         :geotiff
-                     :temperature                      {:path "tmp.tif" :cell-size 984.252}
-                     :fetch-relative-humidity-method   :postgis
-                     :relative-humidity                {:sql "rh.slp WHERE rid=100" :cell-size 984.252}
-                     :fetch-wind-speed-20ft-method     :geotiff
-                     :wind-speed-20ft                  {:path "ws.tif" :cell-size 984.252}
-                     :fetch-wind-from-direction-method :geotiff
-                     :wind-from-direction              {:path "wd.tif" :cell-size 984.252}})
