@@ -42,7 +42,7 @@
   [target cell-size]
   (<= 0.0 (mod cell-size target) 0.002))
 
-(defn weather-cell-size-correct-multiples?
+(defn valid-weather-cell-sizes?
   [{:keys [cell-size] :as config}]
   (let [weather    (map config weather-names)
         cell-sizes (->> weather
@@ -51,7 +51,7 @@
                         (map (comp :cell-size second)))]
     (every? #(multiple? cell-size %) cell-sizes)))
 
-(defn weather-fetch-methods
+(defn valid-weather-fetch-methods?
   [config]
   (let [f               (fn [k] (keyword (str/join "-" ["fetch" (name k) "method"])))
         weather-rasters (->> weather-names
@@ -98,5 +98,5 @@
     :req-un [::cell-size
              ::landfire-layers])
    ::weather-layers
-   #(weather-cell-size-correct-multiples? %)
-   #(weather-fetch-methods %)))
+   #(valid-weather-cell-sizes? %)
+   #(valid-weather-fetch-methods? %)))
