@@ -1,5 +1,6 @@
 (ns gridfire.config-validation-test
   (:require [gridfire.validation :as validation]
+            [gridfire.crown-fire :refer [m->ft]]
             [clojure.spec.alpha :as s]
             [clojure.test :refer [deftest is testing]]))
 
@@ -21,8 +22,8 @@
 ;;-----------------------------------------------------------------------------
 
 (deftest weather-cell-size-test
-  (let [high-res 98.425
-        low-res  984.25
+  (let [high-res (m->ft 30)
+        low-res  (* high-res 10)
         temp     (s/conform ::validation/weather
                             {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
                              :cell-size low-res})
@@ -44,12 +45,12 @@
 
 (deftest weather-cell-invalid-test
   (testing "Invalid cell-size for a weather raster"
-    (let [res    100.0
-          temp   (s/conform ::validation/weather
-                            {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
-                             :cell-size (+ res (/ res 2))})
-          config {:cell-size   res
-                  :temperature temp}]
+    (let [cell-size (m->ft 30)
+          temp      (s/conform ::validation/weather
+                               {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
+                                :cell-size (+ cell-size (/ cell-size 2))})
+          config    {:cell-size   cell-size
+                     :temperature temp}]
 
       (is (false? (validation/valid-weather-cell-sizes? config))))))
 
