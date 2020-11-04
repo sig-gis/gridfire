@@ -1,5 +1,6 @@
 (ns gridfire.config-validation-test
   (:require [gridfire.validation :as validation]
+            [clojure.spec.alpha :as s]
             [clojure.test :refer [deftest is testing]]))
 
 ;;-----------------------------------------------------------------------------
@@ -20,57 +21,50 @@
 ;;-----------------------------------------------------------------------------
 
 (deftest weather-cell-size-test
-  (testing "Valid cell-size for a weather raster"
-    (let [config       {:cell-size   800
-                        :temperature {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
-                                      :cell-size 80}}
-          [result err] (validation/weather-cell-size config)]
+  (let [high-res 98.425
+        low-res  984.25
+        temp     (s/conform ::validation/weather
+                            {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
+                             :cell-size low-res})
+        rh       (s/conform ::validation/weather
+                            {:path      (in-file-path "weather-test/rh_to_sample.tif")
+                             :cell-size low-res})]
+    (testing "Valid cell-size for a weather raster"
+      (let [config {:cell-size   high-res
+                    :temperature temp}]
 
-      (is (= config result))
+        (is (true? (validation/valid-weather-cell-sizes? config)))))
 
-      (is (nil? err))))
+    (testing "Valid cell-size for multiple weather raster"
+      (let [config {:cell-size         high-res
+                    :temperature       temp
+                    :relative-humidity temp}]
 
-  (testing "Valid cell-size for multiple weather raster"
-    (let [config       {:cell-size         800
-                        :temperature       {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
-                                            :cell-size 80}
-                        :relative-humidity {:path      (in-file-path "weather-test/rh_to_sample.tif")
-                                            :cell-size 80}}
-          [result err] (validation/weather-cell-size config)]
+        (is (true? (validation/valid-weather-cell-sizes? config)))))))
 
-      (is (= config result))
-
-      (is (nil? err))))
-
+(deftest weather-cell-invalid-test
   (testing "Invalid cell-size for a weather raster"
-    (let [config       {:cell-size   800
-                        :temperature {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
-                                      :cell-size 81}}
-          [result err] (validation/weather-cell-size config)]
+    (let [res    100.0
+          temp   (s/conform ::validation/weather
+                            {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
+                             :cell-size (+ res (/ res 2))})
+          config {:cell-size   res
+                  :temperature temp}]
 
-      (is (nil? result))
-
-      (is (some? err)))))
+      (is (false? (validation/valid-weather-cell-sizes? config))))))
 
 (deftest weather-fetch-method-test
   (testing "Weather raster input (string) must have accompanying fetch method keyword"
-    (let [config       {:temperature (in-file-path "weather-test/tmpf_to_sample.tif")}
-          [result err] (validation/weather-fetch-methods config)]
+    (let [temp   (s/conform ::validation/weather
+                            (in-file-path "weather-test/tmpf_to_sample.tif"))
+          config {:temperature temp}]
 
-      (is (nil? result))
-
-      (is (some? err))
-
-      (is (= err "Missing these fetch-<weather>-method keywords: (:fetch-temperature-method)"))))
+      (is (false? (validation/valid-weather-fetch-methods? config)))))
 
   (testing "Weather raster input (map) must have accompanying fetch method keyword"
-    (let [config       {:temperature {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
-                                      :cell-size 80}}
-          [result err] (validation/weather-fetch-methods config)]
+    (let [temp   (s/conform ::validation/weather
+                            {:path      (in-file-path "weather-test/tmpf_to_sample.tif")
+                             :cell-size 80.0})
+          config {:temperature temp}]
 
-      (is (nil? result))
-
-      (is (some? err))
-
-      (is (= err "Missing these fetch-<weather>-method keywords: (:fetch-temperature-method)"))))
-  )
+      (is (false? (validation/valid-weather-fetch-methods? config))))))
