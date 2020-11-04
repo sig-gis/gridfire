@@ -25,41 +25,70 @@
                     (assoc m k (convert v)))
                   {})))
 
-(defn build-edn
-  [{:strs [FUELS_AND_TOPOGRAPHY_DIRECTORY ASP_FILENAME CBH_FILENAME CC_FILENAME
-           CH_FILENAME CBD_FILENAME FBFM_FILENAME SLP_FILENAME DEM_FILENAME
-           COMPUTATIONAL_DOMAIN_CELLSIZE PHI_FILENAME MAX_RUNTIME
-           STOCHASTIC_TMP_FILENAME STOCHASTIC_RH_FILENAME STOCHASTIC_WS_FILENAME
-           STOCHASTIC_WD_FILENAME FOLIAR_MOISTURE_CONTENT FOLIAR_MOISTURE_CONTENT
-           SEED]}
-   {:keys [verbose]}]
+(defn process-landfire-layers
+  [{:strs [ASP_FILENAME CBH_FILENAME CC_FILENAME CH_FILENAME CBD_FILENAME
+           FBFM_FILENAME SLP_FILENAME DEM_FILENAME FUELS_AND_TOPOGRAPHY_DIRECTORY]}
+   _
+   config]
   (let [dir FUELS_AND_TOPOGRAPHY_DIRECTORY]
-    {:fetch-layer-method        :geotiff
-     :landfire-layers           {:aspect             (file-path dir ASP_FILENAME)
+    (merge config
+           {:fetch-layer-method :geotiff
+            :landfire-layers    {:aspect             (file-path dir ASP_FILENAME)
                                  :canopy-base-height (file-path dir CBH_FILENAME)
                                  :canopy-cover       (file-path dir CC_FILENAME)
                                  :canopy-height      (file-path dir CH_FILENAME)
                                  :crown-bulk-density (file-path dir CBD_FILENAME)
+                                 :elevation          (file-path dir DEM_FILENAME)
                                  :fuel-model         (file-path dir FBFM_FILENAME)
-                                 :slope              (file-path dir SLP_FILENAME)
-                                 :elevation          (file-path dir DEM_FILENAME)}
-     :cell-size                 (m->ft COMPUTATIONAL_DOMAIN_CELLSIZE)
-     :fetch-ignition-method     :geotiff
-     :ignition-layer            (file-path dir PHI_FILENAME)
-     :max-runtime               MAX_RUNTIME
-     :temperature               (file-path dir STOCHASTIC_TMP_FILENAME)
-     :relative-humidity         (file-path dir STOCHASTIC_RH_FILENAME)
-     :wind-speed-20ft           (file-path dir STOCHASTIC_WS_FILENAME)
-     :wind-from-direction       (file-path dir STOCHASTIC_WD_FILENAME)
-     :foliar-moisture           FOLIAR_MOISTURE_CONTENT
-     :ellipse-adjustment-factor 1.0
-     :simulations               10
-     :random-seed               SEED
-     :outfile-suffix            ""
-     :output-landfire-inputs?   false
-     :output-geotiffs?          false
-     :output-pngs?              (if verbose true false)
-     :output-csvs?              (if verbose true false)}))
+                                 :slope              (file-path dir SLP_FILENAME)}})))
+
+(defn process-ignition
+  [{:strs [NUM_IGNITIONS PHI_FILENAME FUELS_AND_TOPOGRAPHY_DIRECTORY]}
+   _
+   config]
+  (let [dir FUELS_AND_TOPOGRAPHY_DIRECTORY]
+    (merge config
+           {:fetch-ignition-method :geotiff
+            :ignition-layer        (file-path dir PHI_FILENAME)})))
+
+(defn process-weather
+  [{:strs [STOCHASTIC_TMP_FILENAME STOCHASTIC_RH_FILENAME STOCHASTIC_WS_FILENAME
+           STOCHASTIC_WD_FILENAME FOLIAR_MOISTURE_CONTENT FUELS_AND_TOPOGRAPHY_DIRECTORY]}
+   _
+   config]
+  (let [dir FUELS_AND_TOPOGRAPHY_DIRECTORY]
+    (merge config
+           {:temperature         (file-path dir STOCHASTIC_TMP_FILENAME)
+            :relative-humidity   (file-path dir STOCHASTIC_RH_FILENAME)
+            :wind-speed-20ft     (file-path dir STOCHASTIC_WS_FILENAME)
+            :wind-from-direction (file-path dir STOCHASTIC_WD_FILENAME)
+            :foliar-moisture     FOLIAR_MOISTURE_CONTENT})))
+
+(defn process-output
+  [data {:keys [verbose]} config]
+  (merge config
+         {:outfile-suffix          ""
+          :output-landfire-inputs? false
+          :output-geotiffs?        false
+          :output-pngs?            (if verbose true false)
+          :output-csvs?            (if verbose true false)}))
+
+(defn sec->min
+  [seconds]
+  (* 60 seconds))
+
+(defn build-edn
+  [{:strs [COMPUTATIONAL_DOMAIN_CELLSIZE MAX_RUNTIME NUM_ENSEMBLE_MEMBERS SEED] :as data}
+   options]
+  (->> {:cell-size                 (m->ft COMPUTATIONAL_DOMAIN_CELLSIZE)
+        :max-runtime               (sec->min MAX_RUNTIME)
+        :simulations               NUM_ENSEMBLE_MEMBERS
+        :random-seed               SEED
+        :ellipse-adjustment-factor 1.0}
+       (process-landfire-layers data options)
+       (process-ignition data options)
+       (process-weather data options)
+       (process-output data options)))
 
 (defn write-config [config-params]
   (let [file "gridfire-config.edn"]
