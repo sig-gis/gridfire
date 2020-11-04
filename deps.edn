@@ -4,6 +4,8 @@
  :deps {org.clojure/clojure                 {:mvn/version "1.10.1"}
         org.clojure/data.csv                {:mvn/version "1.0.0"}
         org.clojure/java.jdbc               {:mvn/version "0.7.11"}
+        org.clojure/spec.alpha              {:mvn/version "0.2.187"}
+        org.clojure/core.specs.alpha        {:mvn/version "0.2.44"}
         org.postgresql/postgresql           {:mvn/version "42.2.16"}
         net.mikera/core.matrix              {:mvn/version "0.62.0"}
         net.mikera/vectorz-clj              {:mvn/version "0.48.0"}
