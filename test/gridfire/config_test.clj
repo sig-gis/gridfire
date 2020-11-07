@@ -53,7 +53,7 @@
                    :cell-size                 (m->ft 30.0),
                    :fetch-ignition-method     :geotiff,
                    :ignition-layer            "./fuels_and_topography/phi.tif",
-                   :max-runtime               180.0,
+                   :max-runtime               3,
                    :temperature               "./fuels_and_topography/tmpf_to_sample.tif",
                    :relative-humidity         "./fuels_and_topography/rh_to_sample.tif",
                    :wind-speed-20ft           "./fuels_and_topography/ws_to_sample.tif",

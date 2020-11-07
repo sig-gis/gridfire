@@ -75,7 +75,7 @@
 
 (defn sec->min
   [seconds]
-  (* 60 seconds))
+  (int (/ seconds 60)))
 
 (defn build-edn
   [{:strs [COMPUTATIONAL_DOMAIN_CELLSIZE MAX_RUNTIME NUM_ENSEMBLE_MEMBERS SEED] :as data}
