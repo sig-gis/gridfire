@@ -1,7 +1,8 @@
 (ns gridfire.cli-test
   (:require [clojure.test :refer [deftest is testing]]
             [gridfire.cli :as cli]
-            [gridfire.fetch :as fetch])
+            [gridfire.fetch :as fetch]
+            [gridfire.crown-fire :refer [m->ft]])
   (:import java.util.Random))
 
 ;;-----------------------------------------------------------------------------
@@ -272,12 +273,12 @@
 (deftest run-simulation-using-lower-resolution-weather-test
   (testing "Running simulation using temperature data from geotiff file"
     (let [config  (merge test-config-base
-                         {:cell-size                800
+                         {:cell-size                (m->ft 30)
                           :fetch-layer-method       :geotiff
                           :landfire-layers          landfire-layers-weather-test
                           :fetch-temperature-method :geotiff
                           :temperature              {:path      (in-file-path "weather-test/tmpf_to_sample_lower_res.tif")
-                                                     :cell-size 80}})
+                                                     :cell-size (m->ft 300)}})
           results (run-simulation config)]
 
       (is (every? some? results)))))
@@ -285,19 +286,19 @@
 (deftest multiplier-lookup-test
   (testing "constructing multiplier lookup for weather rasters"
     (testing "with single weather raster"
-      (let [config {:cell-size   98.425
+      (let [config {:cell-size   (m->ft 30)
                     :temperature {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
-                                  :cell-size 984.252}}
+                                  :cell-size (m->ft 300)}}
             lookup (cli/create-multiplier-lookup config)]
 
         (is (= {:temperature 10} lookup))))
 
     (testing "with multiple weather rasters"
-      (let [config {:cell-size         98.425
+      (let [config {:cell-size         (m->ft 30)
                     :temperature       {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
-                                        :cell-size 984.252}
+                                        :cell-size (m->ft 300)}
                     :relative-humidity {:path      (in-file-path "/weather-test/rh_to_sample_lower_res.tif")
-                                        :cell-size 984.252}}
+                                        :cell-size (m->ft 300)}}
             lookup (cli/create-multiplier-lookup config)]
 
         (is (= {:temperature       10
