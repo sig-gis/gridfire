@@ -6,7 +6,7 @@
 ;; Regex
 ;;-----------------------------------------------------------------------------
 
-(def postgis-sql-regex #"[a-z]+(\.[a-z]+)? WHERE rid=[0-9]+")
+(def postgis-sql-regex #"[a-z0-9]+(\.[a-z0-9]+)? WHERE rid=[0-9]+")
 (def path-to-geotiff-regex #"[a-z_\-\s0-9\.]+(\/[a-z_\-\s0-9\.]+)*\.tif")
 
 (s/def ::sql (s/and string? #(re-matches postgis-sql-regex %)))
