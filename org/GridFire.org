@@ -1770,16 +1770,19 @@ pseudo-code lays out the steps taken in this procedure:
 (ns gridfire.fire-spread
   (:require [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as mop]
-            [gridfire.fuel-models :refer [build-fuel-model moisturize]]
-            [gridfire.surface-fire :refer [rothermel-surface-fire-spread-no-wind-no-slope
-                                           rothermel-surface-fire-spread-max
-                                           rothermel-surface-fire-spread-any
-                                           anderson-flame-depth byram-fire-line-intensity
-                                           byram-flame-length wind-adjustment-factor]]
-            [gridfire.crown-fire :refer [van-wagner-crown-fire-initiation?
-                                         cruz-crown-fire-spread
+            [gridfire.crown-fire :refer [crown-fire-eccentricity
                                          crown-fire-line-intensity
-                                         crown-fire-eccentricity]]
+                                         cruz-crown-fire-spread
+                                         van-wagner-crown-fire-initiation?]]
+            [gridfire.fuel-models :refer [build-fuel-model moisturize]]
+            [gridfire.surface-fire :refer [anderson-flame-depth
+                                           byram-fire-line-intensity
+                                           byram-flame-length
+                                           rothermel-surface-fire-spread-any
+                                           rothermel-surface-fire-spread-max
+                                           rothermel-surface-fire-spread-no-wind-no-slope
+                                           wind-adjustment-factor]]
+            [gridfire.utils.random :refer [random-float]]
             [mikera.vectorz.core :as v]))
 
 (m/set-current-implementation :vectorz)
@@ -1917,10 +1920,23 @@ pseudo-code lays out the steps taken in this procedure:
 (defn sample-at
   [here global-clock raster multiplier]
   (let [[i j] (if multiplier
-                (map #(quot % (or multiplier 1)) here)
+                (map #(quot % multiplier) here)
                 here)
-        band  (quot global-clock 60.0)] ;; Assuming each band is 1 hour
+        band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
     (m/mget raster band i j)))
+
+(defn sample-landfire-at
+  [{:keys [spatial-type pdf-min pdf-max global-value rand-generator]}
+   matrix
+   [i j]]
+  (let [value-here (m/mget matrix i j)]
+    (cond
+      (= spatial-type :global) (+ value-here global-value)
+      (= spatial-type :pixel)  (+ value-here (random-float pdf-min pdf-max rand-generator))
+      :else                    value-here)))
+
+(def sample-landfire-at
+  (memoize sample-landfire-at))
 
 (defn fuel-moisture [here temperature relative-humidity global-clock multiplier-lookup]
   (let [tmp                  (if (v/vectorz? temperature)
@@ -1942,60 +1958,67 @@ pseudo-code lays out the steps taken in this procedure:
      :live {:herbaceous (* equilibrium-moisture 2.0)
             :woody      (* equilibrium-moisture 0.5)}}))
 
+(defn extract-constants
+  [{:keys [landfire-layers wind-speed-20ft wind-from-direction temperature relative-humidity
+           foliar-moisture ellipse-adjustment-factor multiplier-lookup perturbations]}
+   global-clock
+   [i j :as here]]
+  (let [{:keys [slope aspect canopy-height canopy-base-height crown-bulk-density
+                canopy-cover fuel-model]} landfire-layers]
+    {:wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
+                            (sample-at here
+                                       global-clock
+                                       wind-speed-20ft
+                                       (:wind-speed-20ft multiplier-lookup))
+                            wind-speed-20ft)
+     :wind-from-direction (if (v/vectorz? wind-from-direction)
+                            (sample-at here
+                                       global-clock
+                                       wind-from-direction
+                                       (:wind-from-direction multiplier-lookup))
+                            wind-from-direction)
+     :fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock multiplier-lookup)
+     :fuel-model-number   (sample-landfire-at (:fuel-model perturbations) fuel-model here)
+     :slope               (m/mget slope i j)
+     :aspect              (m/mget aspect i j)
+     :canopy-height       (sample-landfire-at (:canopy-height perturbations) canopy-height here)
+     :canopy-base-height  (sample-landfire-at (:canopy-base-height perturbations) canopy-base-height here)
+     :crown-bulk-density  (sample-landfire-at (:crown-bulk-density perturbations) crown-bulk-density here)
+     :canopy-cover        (sample-landfire-at (:canopy-cover perturbations) canopy-cover here)}))
+
 (defn compute-neighborhood-fire-spread-rates!
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
   :terrain-distance ft, :spread-rate ft/min, :fire-line-intensity Btu/ft/s, :flame-length ft,
   :fractional-distance [0-1]}, one for each cell adjacent to here."
-  [{:keys [landfire-layers
-           wind-speed-20ft
-           wind-from-direction
-           temperature
-           relative-humidity
-           foliar-moisture
-           ellipse-adjustment-factor
-           cell-size
-           num-rows
-           num-cols
-           multiplier-lookup]}
+  [{:keys [landfire-layers foliar-moisture ellipse-adjustment-factor cell-size num-rows num-cols] :as constants}
    fire-spread-matrix
    [i j :as here]
    overflow-trajectory
    overflow-heat
    global-clock]
-  (let [wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
-                              (sample-at here
-                                         global-clock
-                                         wind-speed-20ft
-                                         (:wind-speed-20ft multiplier-lookup))
-                              wind-speed-20ft)
-        wind-from-direction (if (v/vectorz? wind-from-direction)
-                              (sample-at here
-                                         global-clock
-                                         wind-from-direction
-                                         (:wind-from-direction multiplier-lookup))
-                              wind-from-direction)
-        fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock multiplier-lookup)
-        fuel-model-number   (m/mget (:fuel-model         landfire-layers) i j)
-        slope               (m/mget (:slope              landfire-layers) i j)
-        aspect              (m/mget (:aspect             landfire-layers) i j)
-        canopy-height       (m/mget (:canopy-height      landfire-layers) i j)
-        canopy-base-height  (m/mget (:canopy-base-height landfire-layers) i j)
-        crown-bulk-density  (m/mget (:crown-bulk-density landfire-layers) i j)
-        canopy-cover        (m/mget (:canopy-cover       landfire-layers) i j)
-        [fuel-model
-         spread-info-min]   (rothermel-fast-wrapper fuel-model-number fuel-moisture)
-        midflame-wind-speed (* wind-speed-20ft 88.0
-                               (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
-        spread-info-max     (rothermel-surface-fire-spread-max spread-info-min
-                                                               midflame-wind-speed
-                                                               wind-from-direction
-                                                               slope
-                                                               aspect
-                                                               ellipse-adjustment-factor)
-        crown-spread-max    (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
-                                                    (-> fuel-moisture :dead :1hr))
-        crown-eccentricity  (crown-fire-eccentricity wind-speed-20ft
-                                                     ellipse-adjustment-factor)]
+  (let [{:keys
+         [wind-speed-20ft
+          wind-from-direction
+          fuel-moisture
+          fuel-model-number
+          slope
+          aspect
+          canopy-height
+          canopy-base-height
+          crown-bulk-density
+          canopy-cover]}             (extract-constants constants global-clock here)
+        [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model-number fuel-moisture)
+        midflame-wind-speed          (* wind-speed-20ft 88.0 (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
+        spread-info-max              (rothermel-surface-fire-spread-max spread-info-min
+                                                                        midflame-wind-speed
+                                                                        wind-from-direction
+                                                                        slope
+                                                                        aspect
+                                                                        ellipse-adjustment-factor)
+        crown-spread-max             (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
+                                                             (-> fuel-moisture :dead :1hr))
+        crown-eccentricity           (crown-fire-eccentricity wind-speed-20ft
+                                                              ellipse-adjustment-factor)]
     (into []
           (comp
            (filter #(and (in-bounds? num-rows num-cols %)
@@ -2500,13 +2523,15 @@ or false:
             [clojure.data.csv :as csv]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.string :as s]
+            [clojure.string :as str]
+            [clojure.spec.alpha :as s]
             [gridfire.fetch :as fetch]
             [gridfire.fire-spread :refer [run-fire-spread]]
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
-            [gridfire.validation :refer [valid-config? weather-names]]
+            [gridfire.spec.config :as spec]
+            [gridfire.utils.random :refer [my-rand-int my-rand-nth random-float]]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
                                    register-new-crs-definitions-from-properties-file!
@@ -2579,18 +2604,6 @@ or false:
            {}
            layer-names)))
 
-(defn my-rand
-  ([^Random rand-generator] (.nextDouble rand-generator))
-  ([^Random rand-generator n] (* n (my-rand rand-generator))))
-
-(defn my-rand-int
-  [rand-generator n]
-  (int (my-rand rand-generator n)))
-
-(defn my-rand-nth
-  [rand-generator coll]
-  (nth coll (my-rand-int rand-generator (count coll))))
-
 (defn sample-from-list
   [rand-generator n xs]
   (repeatedly n #(my-rand-nth rand-generator xs)))
@@ -2606,6 +2619,20 @@ or false:
         (cond (list? x)   (sample-from-list rand-generator n x)
               (vector? x) (sample-from-range rand-generator n x)
               :else       (repeat n x))))
+
+(defn draw-perturbation-samples
+  [rand-generator n perturbations]
+  (when perturbations
+   (map
+    #(reduce-kv (fn [acc k {:keys [spatial-type pdf-min pdf-max] :as v}]
+                  (let [simulation-id %]
+                    (if (= spatial-type :global)
+                      (update-in acc [k] assoc :global-value  (random-float pdf-min pdf-max rand-generator))
+                      (update-in acc [k] merge {:simulation-id  simulation-id
+                                                :rand-generator rand-generator}))))
+                perturbations
+                perturbations)
+    (range n))))
 
 (defn cells-to-acres
   [cell-size num-cells]
@@ -2671,7 +2698,7 @@ or false:
    landfire-rasters envelope ignition-row
    ignition-col max-runtime temperature relative-humidity wind-speed-20ft
    wind-from-direction foliar-moisture ellipse-adjustment-factor ignition-raster
-   multiplier-lookup]
+   multiplier-lookup perturbations]
   (mapv
    (fn [i]
      (let [initial-ignition-site (or ignition-raster
@@ -2692,7 +2719,8 @@ or false:
                                       :ellipse-adjustment-factor (ellipse-adjustment-factor i)
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
                                       :num-cols                  (m/row-count (:fuel-model landfire-rasters))
-                                      :multiplier-lookup         multiplier-lookup}
+                                      :multiplier-lookup         multiplier-lookup
+                                      :perturbations             perturbations}
                                      initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
@@ -2775,20 +2803,21 @@ or false:
 
 (defn get-weather [config rand-generator weather-type]
   (let [val          (config weather-type)
-        fetch-method (keyword (s/join "-" ["fetch" (name weather-type) "method"]))]
+        fetch-method (keyword (str/join "-" ["fetch" (name weather-type) "method"]))]
     (if (contains? config fetch-method)
-      (let [raster (fetch/weather config weather-type)]
-        raster)
+      (fetch/weather config weather-type)
       (draw-samples rand-generator (:simulations config) val))))
 
 (defn create-multiplier-lookup
   [{:keys [cell-size] :as config}]
-  (let [weather-keys (->> weather-names
+  (let [weather-keys (->> spec/weather-names
                           (select-keys config)
                           (filter (fn [[k v]] (map? v)))
                           keys)]
     (reduce (fn [acc k]
-              (assoc acc k (quot cell-size (get-in config [k :cell-size]))))
+              (assoc acc k (int (quot
+                                 (get-in config [k :cell-size])
+                                 cell-size))))
             {}
             weather-keys)))
 
@@ -2800,20 +2829,19 @@ or false:
 (defn -main
   [& config-files]
   (doseq [config-file config-files]
-    (let [config       (edn/read-string (slurp config-file))
-          [config err] (valid-config? config)]
-      (if config
+    (let [config (edn/read-string (slurp config-file))]
+      (if (s/valid? ::spec/config config)
         (let [multiplier-lookup (create-multiplier-lookup config)
               landfire-layers   (fetch-landfire-layers config)
               landfire-rasters  (into {}
-                                     (map (fn [[layer info]] [layer (:matrix info)]))
-                                     landfire-layers)
+                                      (map (fn [[layer info]] [layer (:matrix info)]))
+                                      landfire-layers)
               ignition-raster   (fetch/initial-ignition-layers config)
               envelope          (get-envelope config landfire-layers)
               simulations       (:simulations config)
               rand-generator    (if-let [seed (:random-seed config)]
-                                 (Random. seed)
-                                 (Random.))]
+                                  (Random. seed)
+                                  (Random.))]
           (when (:output-landfire-inputs? config)
             (doseq [[layer matrix] landfire-rasters]
               (-> (matrix-to-raster (name layer) matrix envelope)
@@ -2832,11 +2860,39 @@ or false:
                 (draw-samples rand-generator simulations (:foliar-moisture config))
                 (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
                 ignition-raster
-                multiplier-lookup)
+                multiplier-lookup
+                (draw-perturbation-samples rand-generator simulations (:perturbations config)))
                (write-csv-outputs
                 (:output-csvs? config)
                 (str "summary_stats" (:outfile-suffix config) ".csv"))))
-        (print-error err config)))))
+        (s/explain ::spec/config config)))))
+#+end_src
+
+#+name: utils-random
+#+begin_src clojure :results silent :exports code :tangle ../src/gridfire/utils/random.clj :padline no :no-expand :comments link
+(ns gridfire.utils.random
+  (:import java.util.Random))
+
+(defn my-rand
+  ([^Random rand-generator] (.nextDouble rand-generator))
+  ([^Random rand-generator n] (* n (my-rand rand-generator))))
+
+(defn my-rand
+  ([^Random rand-generator] (.nextDouble rand-generator))
+  ([^Random rand-generator n] (* n (my-rand rand-generator))))
+
+(defn my-rand-int
+  [rand-generator n]
+  (int (my-rand rand-generator n)))
+
+(defn my-rand-nth
+  [rand-generator coll]
+  (nth coll (my-rand-int rand-generator (count coll))))
+
+(defn random-float
+  [min-val max-val rand-generator]
+  (let [range (- max-val min-val)]
+    (+ min-val (my-rand rand-generator range))))
 #+end_src
 
 * Configuration file
@@ -2993,8 +3049,8 @@ this functionality.
 
 (defmethod weather :postgis-temperature
   [{:keys [temperature db-spec] :as config} type]
-  (let [path (if (map? temperature) (:path temperature) temperature)]
-    (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
+  (let [sql (if (map? temperature) (:sql temperature) temperature)]
+    (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
 
 (defmethod weather :geotiff-temperature
   [{:keys [temperature] :as config} type]
@@ -3003,8 +3059,8 @@ this functionality.
 
 (defmethod weather :postgis-relative-humidity
   [{:keys [relative-humidity db-spec] :as config} type]
-  (let [path (if (map? relative-humidity) (:path relative-humidity) relative-humidity)]
-   (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
+  (let [sql (if (map? relative-humidity) (:sql relative-humidity) relative-humidity)]
+   (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
 
 (defmethod weather :geotiff-relative-humidity
   [{:keys [relative-humidity] :as config} type]
@@ -3013,8 +3069,8 @@ this functionality.
 
 (defmethod weather :postgis-wind-speed-20ft
   [{:keys [wind-speed-20ft db-spec] :as config} type]
-  (let [path (if (map? wind-speed-20ft) (:path wind-speed-20ft) wind-speed-20ft)]
-   (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
+  (let [sql (if (map? wind-speed-20ft) (:sql wind-speed-20ft) wind-speed-20ft)]
+   (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
 
 (defmethod weather :geotiff-wind-speed-20ft
   [{:keys [wind-speed-20ft] :as config} type]
@@ -3023,8 +3079,8 @@ this functionality.
 
 (defmethod weather :postgis-wind-from-direction
   [{:keys [wind-from-direction db-spec] :as config} type]
-  (let [path (if (map? wind-from-direction) (:path wind-from-direction) wind-from-direction)]
-      (:matrix (postgis-raster-to-matrix-multiband db-spec path))))
+  (let [sql (if (map? wind-from-direction) (:sql wind-from-direction) wind-from-direction)]
+      (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
 
 (defmethod weather :geotiff-wind-from-direction
   [{:keys [wind-from-direction] :as config} type]

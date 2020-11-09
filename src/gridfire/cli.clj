@@ -12,7 +12,8 @@
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
             [gridfire.surface-fire :refer [degrees-to-radians]]
-            [gridfire.validation :as validation]
+            [gridfire.spec.config :as spec]
+            [gridfire.utils.random :refer [my-rand-int my-rand-nth random-float]]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
                                    register-new-crs-definitions-from-properties-file!
@@ -85,18 +86,6 @@
            {}
            layer-names)))
 
-(defn my-rand
-  ([^Random rand-generator] (.nextDouble rand-generator))
-  ([^Random rand-generator n] (* n (my-rand rand-generator))))
-
-(defn my-rand-int
-  [rand-generator n]
-  (int (my-rand rand-generator n)))
-
-(defn my-rand-nth
-  [rand-generator coll]
-  (nth coll (my-rand-int rand-generator (count coll))))
-
 (defn sample-from-list
   [rand-generator n xs]
   (repeatedly n #(my-rand-nth rand-generator xs)))
@@ -112,6 +101,20 @@
         (cond (list? x)   (sample-from-list rand-generator n x)
               (vector? x) (sample-from-range rand-generator n x)
               :else       (repeat n x))))
+
+(defn draw-perturbation-samples
+  [rand-generator n perturbations]
+  (when perturbations
+   (map
+    #(reduce-kv (fn [acc k {:keys [spatial-type pdf-min pdf-max] :as v}]
+                  (let [simulation-id %]
+                    (if (= spatial-type :global)
+                      (update-in acc [k] assoc :global-value  (random-float pdf-min pdf-max rand-generator))
+                      (update-in acc [k] merge {:simulation-id  simulation-id
+                                                :rand-generator rand-generator}))))
+                perturbations
+                perturbations)
+    (range n))))
 
 (defn cells-to-acres
   [cell-size num-cells]
@@ -177,7 +180,7 @@
    landfire-rasters envelope ignition-row
    ignition-col max-runtime temperature relative-humidity wind-speed-20ft
    wind-from-direction foliar-moisture ellipse-adjustment-factor ignition-raster
-   multiplier-lookup]
+   multiplier-lookup perturbations]
   (mapv
    (fn [i]
      (let [initial-ignition-site (or ignition-raster
@@ -198,7 +201,8 @@
                                       :ellipse-adjustment-factor (ellipse-adjustment-factor i)
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
                                       :num-cols                  (m/row-count (:fuel-model landfire-rasters))
-                                      :multiplier-lookup         multiplier-lookup}
+                                      :multiplier-lookup         multiplier-lookup
+                                      :perturbations             perturbations}
                                      initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
@@ -283,13 +287,12 @@
   (let [val          (config weather-type)
         fetch-method (keyword (str/join "-" ["fetch" (name weather-type) "method"]))]
     (if (contains? config fetch-method)
-      (let [raster (fetch/weather config weather-type)]
-        raster)
+      (fetch/weather config weather-type)
       (draw-samples rand-generator (:simulations config) val))))
 
 (defn create-multiplier-lookup
   [{:keys [cell-size] :as config}]
-  (let [weather-keys (->> validation/weather-names
+  (let [weather-keys (->> spec/weather-names
                           (select-keys config)
                           (filter (fn [[k v]] (map? v)))
                           keys)]
@@ -309,7 +312,7 @@
   [& config-files]
   (doseq [config-file config-files]
     (let [config (edn/read-string (slurp config-file))]
-      (if (s/valid? ::validation/config config)
+      (if (s/valid? ::spec/config config)
         (let [multiplier-lookup (create-multiplier-lookup config)
               landfire-layers   (fetch-landfire-layers config)
               landfire-rasters  (into {}
@@ -339,9 +342,10 @@
                 (draw-samples rand-generator simulations (:foliar-moisture config))
                 (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
                 ignition-raster
-                multiplier-lookup)
+                multiplier-lookup
+                (draw-perturbation-samples rand-generator simulations (:perturbations config)))
                (write-csv-outputs
                 (:output-csvs? config)
                 (str "summary_stats" (:outfile-suffix config) ".csv"))))
-        (s/explain ::validation/config config)))))
+        (s/explain ::spec/config config)))))
 ;; command-line-interface ends here

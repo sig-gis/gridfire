@@ -2,16 +2,19 @@
 (ns gridfire.fire-spread
   (:require [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as mop]
-            [gridfire.fuel-models :refer [build-fuel-model moisturize]]
-            [gridfire.surface-fire :refer [rothermel-surface-fire-spread-no-wind-no-slope
-                                           rothermel-surface-fire-spread-max
-                                           rothermel-surface-fire-spread-any
-                                           anderson-flame-depth byram-fire-line-intensity
-                                           byram-flame-length wind-adjustment-factor]]
-            [gridfire.crown-fire :refer [van-wagner-crown-fire-initiation?
-                                         cruz-crown-fire-spread
+            [gridfire.crown-fire :refer [crown-fire-eccentricity
                                          crown-fire-line-intensity
-                                         crown-fire-eccentricity]]
+                                         cruz-crown-fire-spread
+                                         van-wagner-crown-fire-initiation?]]
+            [gridfire.fuel-models :refer [build-fuel-model moisturize]]
+            [gridfire.surface-fire :refer [anderson-flame-depth
+                                           byram-fire-line-intensity
+                                           byram-flame-length
+                                           rothermel-surface-fire-spread-any
+                                           rothermel-surface-fire-spread-max
+                                           rothermel-surface-fire-spread-no-wind-no-slope
+                                           wind-adjustment-factor]]
+            [gridfire.utils.random :refer [random-float]]
             [mikera.vectorz.core :as v]))
 
 (m/set-current-implementation :vectorz)
@@ -154,6 +157,19 @@
         band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
     (m/mget raster band i j)))
 
+(defn sample-landfire-at
+  [{:keys [spatial-type pdf-min pdf-max global-value rand-generator]}
+   matrix
+   [i j]]
+  (let [value-here (m/mget matrix i j)]
+    (cond
+      (= spatial-type :global) (+ value-here global-value)
+      (= spatial-type :pixel)  (+ value-here (random-float pdf-min pdf-max rand-generator))
+      :else                    value-here)))
+
+(def sample-landfire-at
+  (memoize sample-landfire-at))
+
 (defn fuel-moisture [here temperature relative-humidity global-clock multiplier-lookup]
   (let [tmp                  (if (v/vectorz? temperature)
                                (sample-at here
@@ -174,60 +190,67 @@
      :live {:herbaceous (* equilibrium-moisture 2.0)
             :woody      (* equilibrium-moisture 0.5)}}))
 
+(defn extract-constants
+  [{:keys [landfire-layers wind-speed-20ft wind-from-direction temperature relative-humidity
+           foliar-moisture ellipse-adjustment-factor multiplier-lookup perturbations]}
+   global-clock
+   [i j :as here]]
+  (let [{:keys [slope aspect canopy-height canopy-base-height crown-bulk-density
+                canopy-cover fuel-model]} landfire-layers]
+    {:wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
+                            (sample-at here
+                                       global-clock
+                                       wind-speed-20ft
+                                       (:wind-speed-20ft multiplier-lookup))
+                            wind-speed-20ft)
+     :wind-from-direction (if (v/vectorz? wind-from-direction)
+                            (sample-at here
+                                       global-clock
+                                       wind-from-direction
+                                       (:wind-from-direction multiplier-lookup))
+                            wind-from-direction)
+     :fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock multiplier-lookup)
+     :fuel-model-number   (sample-landfire-at (:fuel-model perturbations) fuel-model here)
+     :slope               (m/mget slope i j)
+     :aspect              (m/mget aspect i j)
+     :canopy-height       (sample-landfire-at (:canopy-height perturbations) canopy-height here)
+     :canopy-base-height  (sample-landfire-at (:canopy-base-height perturbations) canopy-base-height here)
+     :crown-bulk-density  (sample-landfire-at (:crown-bulk-density perturbations) crown-bulk-density here)
+     :canopy-cover        (sample-landfire-at (:canopy-cover perturbations) canopy-cover here)}))
+
 (defn compute-neighborhood-fire-spread-rates!
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
   :terrain-distance ft, :spread-rate ft/min, :fire-line-intensity Btu/ft/s, :flame-length ft,
   :fractional-distance [0-1]}, one for each cell adjacent to here."
-  [{:keys [landfire-layers
-           wind-speed-20ft
-           wind-from-direction
-           temperature
-           relative-humidity
-           foliar-moisture
-           ellipse-adjustment-factor
-           cell-size
-           num-rows
-           num-cols
-           multiplier-lookup]}
+  [{:keys [landfire-layers foliar-moisture ellipse-adjustment-factor cell-size num-rows num-cols] :as constants}
    fire-spread-matrix
    [i j :as here]
    overflow-trajectory
    overflow-heat
    global-clock]
-  (let [wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
-                              (sample-at here
-                                         global-clock
-                                         wind-speed-20ft
-                                         (:wind-speed-20ft multiplier-lookup))
-                              wind-speed-20ft)
-        wind-from-direction (if (v/vectorz? wind-from-direction)
-                              (sample-at here
-                                         global-clock
-                                         wind-from-direction
-                                         (:wind-from-direction multiplier-lookup))
-                              wind-from-direction)
-        fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock multiplier-lookup)
-        fuel-model-number   (m/mget (:fuel-model         landfire-layers) i j)
-        slope               (m/mget (:slope              landfire-layers) i j)
-        aspect              (m/mget (:aspect             landfire-layers) i j)
-        canopy-height       (m/mget (:canopy-height      landfire-layers) i j)
-        canopy-base-height  (m/mget (:canopy-base-height landfire-layers) i j)
-        crown-bulk-density  (m/mget (:crown-bulk-density landfire-layers) i j)
-        canopy-cover        (m/mget (:canopy-cover       landfire-layers) i j)
-        [fuel-model
-         spread-info-min]   (rothermel-fast-wrapper fuel-model-number fuel-moisture)
-        midflame-wind-speed (* wind-speed-20ft 88.0
-                               (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
-        spread-info-max     (rothermel-surface-fire-spread-max spread-info-min
-                                                               midflame-wind-speed
-                                                               wind-from-direction
-                                                               slope
-                                                               aspect
-                                                               ellipse-adjustment-factor)
-        crown-spread-max    (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
-                                                    (-> fuel-moisture :dead :1hr))
-        crown-eccentricity  (crown-fire-eccentricity wind-speed-20ft
-                                                     ellipse-adjustment-factor)]
+  (let [{:keys
+         [wind-speed-20ft
+          wind-from-direction
+          fuel-moisture
+          fuel-model-number
+          slope
+          aspect
+          canopy-height
+          canopy-base-height
+          crown-bulk-density
+          canopy-cover]}             (extract-constants constants global-clock here)
+        [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model-number fuel-moisture)
+        midflame-wind-speed          (* wind-speed-20ft 88.0 (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
+        spread-info-max              (rothermel-surface-fire-spread-max spread-info-min
+                                                                        midflame-wind-speed
+                                                                        wind-from-direction
+                                                                        slope
+                                                                        aspect
+                                                                        ellipse-adjustment-factor)
+        crown-spread-max             (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
+                                                             (-> fuel-moisture :dead :1hr))
+        crown-eccentricity           (crown-fire-eccentricity wind-speed-20ft
+                                                              ellipse-adjustment-factor)]
     (into []
           (comp
            (filter #(and (in-bounds? num-rows num-cols %)
