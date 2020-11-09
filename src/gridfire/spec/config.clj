@@ -1,5 +1,6 @@
-(ns gridfire.validation
-  (:require [clojure.string :as str]
+(ns gridfire.spec.config
+  (:require [gridfire.spec.perturbations :as perturbations]
+            [clojure.string :as str]
             [clojure.spec.alpha :as s]))
 
 ;;-----------------------------------------------------------------------------
@@ -13,7 +14,7 @@
 (s/def ::path (s/and string? #(re-matches path-to-geotiff-regex %)))
 
 ;;-----------------------------------------------------------------------------
-;; Weather
+;; Weather Layers ;;TODO move into own namespace
 ;;-----------------------------------------------------------------------------
 
 (s/def ::postgis-or-geotiff-map
@@ -66,7 +67,7 @@
     (nil? missing-fetch-keywords)))
 
 ;;-----------------------------------------------------------------------------
-;; Landfire Layers
+;; Landfire Layers ;;TODO move into own namespace
 ;;-----------------------------------------------------------------------------
 
 (s/def ::sql-or-path (s/or :sql #(s/valid? ::sql %)
@@ -92,11 +93,17 @@
             ::fuel-model
             ::slope]))
 
+;;-----------------------------------------------------------------------------
+;; Config
+;;-----------------------------------------------------------------------------
+
+
 (s/def ::config
   (s/and
    (s/keys
     :req-un [::cell-size
-             ::landfire-layers])
+             ::landfire-layers]
+    :opt-un [::perturbations/perturbations])
    ::weather-layers
    #(valid-weather-cell-sizes? %)
    #(valid-weather-fetch-methods? %)))
