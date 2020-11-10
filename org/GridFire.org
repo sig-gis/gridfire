@@ -3163,6 +3163,30 @@ multiples of one another.
  :output-csvs?            true}
 #+end_src
 
+** Section 6: Perturbations
+
+Gridfire supports puturbations of input rasters during simulations in order to account
+for inherent uncertainty in the data. A random sampling procedure is implemented such that
+the spatial perturbation to be applied to a given input raster sampled from a
+probability density function (pdf). Currenlty only a uniform distribution is supported
+
+To specify this in the config file include the following mappings:
+
+*perturbations:* a map of layer names to a map of perturbation configurations
+
+#+begin_src clojure
+{:perturbations {:canopy-height {:spatial-type :global
+                                 :pdf-min      -1.0
+                                 :pdf-max      1.0}}}
+#+end_src
+
+The above config specify that a randomly selected value between -1.0 and 1.0 should be added
+to the canopy height value. This perturbation will be applied globally to all cells
+`{:spatial-type :global}`. We could also specify that each cell should be perturbed individually
+by setting `{:spatial-type :pixel}.
+
+* Example Configuration files
+
 Here is a complete sample configuration for using landfire layers from our postigs enabled
 database and initializing burn points from a range of values.
 
@@ -3278,7 +3302,7 @@ This concludes our discussion of GridFire's command line interface.
  #+LATEX: \bibliographystyle{plainnat}
  #+LATEX: \bibliography{GridFire}
 
-* Monte Carlo Simulation :noexport:
+* Monte Carlo Simulation                                           :noexport:
 
 #+name: monte-carlo-simulation
 #+begin_src clojure :results silent :exports none :tangle ../src/gridfire/monte_carlo.clj :padline no :no-expand :comments link
