@@ -105,7 +105,7 @@
 (defn draw-perturbation-samples
   [rand-generator n perturbations]
   (when perturbations
-   (map
+   (mapv
     #(reduce-kv (fn [acc k {:keys [spatial-type pdf-min pdf-max] :as v}]
                   (let [simulation-id %]
                     (if (= spatial-type :global)
@@ -202,7 +202,7 @@
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
                                       :num-cols                  (m/row-count (:fuel-model landfire-rasters))
                                       :multiplier-lookup         multiplier-lookup
-                                      :perturbations             perturbations}
+                                      :perturbations             (perturbations i)}
                                      initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
