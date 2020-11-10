@@ -149,7 +149,7 @@
            :otherwise (+ 21.0606 (* 0.005565 rh rh) (* -0.00035 rh temp) (* -0.483199 rh)))
      30))
 
-(defn sample-at
+(defn sample-weather-at
   [here global-clock raster multiplier]
   (let [[i j] (if multiplier
                 (map #(quot % multiplier) here)
@@ -157,28 +157,33 @@
         band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
     (m/mget raster band i j)))
 
-(defn sample-landfire-at
+(defn perturb-landfire-at
   [{:keys [spatial-type pdf-min pdf-max global-value rand-generator]}
    matrix
    [i j]]
   (let [value-here (m/mget matrix i j)]
-    (cond
-      (= spatial-type :global) (+ value-here global-value)
-      (= spatial-type :pixel)  (+ value-here (random-float pdf-min pdf-max rand-generator))
-      :else                    value-here)))
+   (if (= spatial-type :global)
+     (+ value-here global-value)
+     (+ value-here (random-float pdf-min pdf-max rand-generator)))))
 
-(def sample-landfire-at
-  (memoize sample-landfire-at))
+(def perturb-landfire-at
+  (memoize perturb-landfire-at))
+
+(defn sample-landfire-at
+  [perturbation-info matrix [i j :as here]]
+  (if perturbation-info
+    (perturb-landfire-at perturbation-info matrix here)
+    (m/mget matrix i j)))
 
 (defn fuel-moisture [here temperature relative-humidity global-clock multiplier-lookup]
   (let [tmp                  (if (v/vectorz? temperature)
-                               (sample-at here
+                               (sample-weather-at here
                                           global-clock
                                           temperature
                                           (:temperature multiplier-lookup))
                                temperature)
         rh                   (if (v/vectorz? relative-humidity)
-                               (sample-at here
+                               (sample-weather-at here
                                           global-clock
                                           relative-humidity
                                           (:relative-humidity multiplier-lookup))
@@ -198,13 +203,13 @@
   (let [{:keys [slope aspect canopy-height canopy-base-height crown-bulk-density
                 canopy-cover fuel-model]} landfire-layers]
     {:wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
-                            (sample-at here
+                            (sample-weather-at here
                                        global-clock
                                        wind-speed-20ft
                                        (:wind-speed-20ft multiplier-lookup))
                             wind-speed-20ft)
      :wind-from-direction (if (v/vectorz? wind-from-direction)
-                            (sample-at here
+                            (sample-weather-at here
                                        global-clock
                                        wind-from-direction
                                        (:wind-from-direction multiplier-lookup))
