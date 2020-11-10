@@ -1,6 +1,8 @@
 (ns gridfire.config-test
   (:require [gridfire.config :as config]
             [gridfire.crown-fire :refer [m->ft]]
+            [gridfire.spec.perturbations :as spec-p]
+            [clojure.spec.alpha :as s]
             [clojure.test :refer [deftest is testing]]))
 
 ;;-----------------------------------------------------------------------------
@@ -21,19 +23,31 @@
 ;;-----------------------------------------------------------------------------
 
 (deftest convert-test
-  (is (= 42 (config/convert "42")))
+  (is (= 42 (config/convert-val "42")))
 
-  (is (= 42.0 (config/convert "42.0")))
+  (is (= 42.0 (config/convert-val "42.0")))
 
-  (is (= 42.0 (config/convert "42.")))
+  (is (= 42.0 (config/convert-val "42.")))
 
-  (is (= -42.0 (config/convert "-42.0")))
+  (is (= -42.0 (config/convert-val "-42.0")))
 
-  (is (= true (config/convert ".TRUE.")))
+  (is (= true (config/convert-val ".TRUE.")))
 
-  (is (= false (config/convert ".FALSE.")))
+  (is (= false (config/convert-val ".FALSE.")))
 
-  (is (= "some/directory" (config/convert "'some/directory'"))))
+  (is (= "some/directory" (config/convert-val"'some/directory'"))))
+
+(deftest extract-perturbations-test
+  (let [config  (->> (in-file-path "sample-elmfire.data")
+                     slurp
+                     config/parse)
+        results (config/extract-perturbations config)]
+
+    (is (= {:canopy-bulk-density {:spatial-type :global :pdf-min -0.05 :pdf-max 0.05}
+            :canopy-base-height  {:spatial-type :global :pdf-min -2.0 :pdf-max 2.0}
+            :canopy-cover        {:spatial-type :global :pdf-min -0.05 :pdf-max 0.05}
+            :canopy-height       {:spatial-type :global :pdf-min -5.0 :pdf-max 5.0}}
+           results))))
 
 (deftest read-data-test
   (let [config (config/build-edn (->> (in-file-path "sample-elmfire.data")

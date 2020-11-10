@@ -4,16 +4,27 @@
             [clojure.tools.cli :refer [parse-opts]]
             [gridfire.crown-fire :refer [m->ft]]))
 
+;;-----------------------------------------------------------------------------
+;; Util
+;;-----------------------------------------------------------------------------
+
 (defn file-path [directory file-name]
   (str directory "/" file-name ".tif"))
 
-(defn convert [s]
+(def regex-for-array-item #"^[A-Z0-9\_]+\(\d+\)")
+
+(defn convert-val [s]
   (cond
-    (re-matches #"^-?[0-9]\d*\.(\d+)?$" s) (Float/parseFloat s)
+    (re-matches #"^-?[0-9]\d*\.(\d+)?$" s) (Double/parseDouble s)
     (re-matches #"^\d+$" s)                (Integer/parseInt s)
     (re-matches #".TRUE." s)               true
     (re-matches #".FALSE." s)              false
     :else                                  (subs s 1 (dec (count s)))))
+
+(defn convert-key [s]
+  (if (re-matches regex-for-array-item s)
+    (str/join "-" (str/split s #"[\(-\)]"))
+    s))
 
 (defn parse [s]
   (->> (str/split s #"\n")
@@ -22,8 +33,17 @@
        (map str/trim)
        (apply hash-map)
        (reduce-kv (fn [m k v]
-                    (assoc m k (convert v)))
+                    (assoc m (convert-key k) (convert-val v)))
                   {})))
+
+(defn sec->min
+  [seconds]
+  (int (/ seconds 60)))
+
+;;-----------------------------------------------------------------------------
+;; Landfire
+;;-----------------------------------------------------------------------------
+
 
 (defn process-landfire-layers
   [{:strs [ASP_FILENAME CBH_FILENAME CC_FILENAME CH_FILENAME CBD_FILENAME
@@ -42,6 +62,10 @@
                                  :fuel-model         (file-path dir FBFM_FILENAME)
                                  :slope              (file-path dir SLP_FILENAME)}})))
 
+;;-----------------------------------------------------------------------------
+;; Ignition
+;;-----------------------------------------------------------------------------
+
 (defn process-ignition
   [{:strs [NUM_IGNITIONS PHI_FILENAME FUELS_AND_TOPOGRAPHY_DIRECTORY]}
    _
@@ -50,6 +74,11 @@
     (merge config
            {:fetch-ignition-method :geotiff
             :ignition-layer        (file-path dir PHI_FILENAME)})))
+
+
+;;-----------------------------------------------------------------------------
+;; Weather
+;;-----------------------------------------------------------------------------
 
 (defn process-weather
   [{:strs [STOCHASTIC_TMP_FILENAME STOCHASTIC_RH_FILENAME STOCHASTIC_WS_FILENAME
@@ -64,6 +93,11 @@
             :wind-from-direction (file-path dir STOCHASTIC_WD_FILENAME)
             :foliar-moisture     FOLIAR_MOISTURE_CONTENT})))
 
+
+;;-----------------------------------------------------------------------------
+;; Output
+;;-----------------------------------------------------------------------------
+
 (defn process-output
   [data {:keys [verbose]} config]
   (merge config
@@ -73,9 +107,53 @@
           :output-pngs?            (if verbose true false)
           :output-csvs?            (if verbose true false)}))
 
-(defn sec->min
-  [seconds]
-  (int (/ seconds 60)))
+;;-----------------------------------------------------------------------------
+;; Perturbations
+;;-----------------------------------------------------------------------------
+
+(def elmfire->gridfire
+  "A mapping of Elmfire string names to Gridfire keywords"
+  {"CBH"    :canopy-base-height
+   "CC"     :canopy-cover
+   "CH"     :canopy-height
+   "CBD"    :canopy-bulk-density
+   "GLOBAL" :global
+   "PIXEL"  :pixel})
+
+(defn perturbation-info
+  [config index]
+  {:spatial-type (->> (str/join "-" ["SPATIAL_PERTURBATION" index])
+                      (get config)
+                      (get elmfire->gridfire))
+   :pdf-min      (->> (str/join "-" ["PDF_LOWER_LIMIT" index])
+                      (get config))
+   :pdf-max      (->> (str/join "-" ["PDF_UPPER_LIMIT" index])
+                      (get config))})
+
+(defn perturbation-key [config index]
+  (->> (str/join "-" ["RASTER_TO_PERTURB" index])
+       (get config)
+       (get elmfire->gridfire)))
+
+(defn extract-perturbations
+  [{:strs [NUM_RASTERS_TO_PERTURB] :as config}]
+  (when (pos? NUM_RASTERS_TO_PERTURB)
+    (into {}
+          (map (fn [index]
+                 (when-let [key (perturbation-key config index)]
+                   [key (perturbation-info config index)]))
+               (range 1 (inc NUM_RASTERS_TO_PERTURB))))))
+
+(defn process-perturbations
+  [{:strs [NUM_RASTERS_TO_PERTURB] :as data} options config]
+  (let [perturbations (extract-perturbations data)]
+    (when (seq perturbations)
+      (merge config
+             {:perturbations perturbations}))))
+
+;;-----------------------------------------------------------------------------
+;; Main
+;;-----------------------------------------------------------------------------
 
 (defn build-edn
   [{:strs [COMPUTATIONAL_DOMAIN_CELLSIZE MAX_RUNTIME NUM_ENSEMBLE_MEMBERS SEED] :as data}
@@ -88,7 +166,8 @@
        (process-landfire-layers data options)
        (process-ignition data options)
        (process-weather data options)
-       (process-output data options)))
+       (process-output data options)
+       (process-perturbations data options)))
 
 (defn write-config [config-params]
   (let [file "gridfire-config.edn"]
