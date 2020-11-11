@@ -2,12 +2,15 @@
   (:require [clojure.spec.alpha :as s]))
 
 (s/def ::spatial-type #{:global :pixel})
-(s/def ::pdf-min float?)
-(s/def ::pdf-max float?)
-(s/def ::valid-range (fn [{:keys [pdf-min pdf-max]}] (< pdf-min pdf-max)))
 
-(s/def ::pdf-info (s/and (s/keys :req-un [::spatial-type ::pdf-min ::pdf-max])
-                                  ::valid-range))
+(s/def ::valid-range (fn [{:keys [range]}]
+                       (let [[min-val max-val] range]
+                         (< min-val max-val))))
+
+(s/def ::range (s/coll-of int? :kind vector? :count 2))
+
+(s/def ::pdf-info (s/and (s/keys :req-un [::spatial-type ::range])
+                         ::valid-range))
 
 (s/def ::canopy-height ::pdf-info)
 (s/def ::canopy-base-height ::pdf-info)

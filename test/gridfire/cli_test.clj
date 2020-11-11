@@ -309,7 +309,6 @@
   (testing "perturbing canopy height landfire layer"
     (let [config  (merge test-config-base
                          {:perturbations {:canopy-height {:spatial-type :global
-                                                          :pdf-min      -1.0
-                                                          :pdf-max      1.0}}})
+                                                          :range [-1.0 1.0]}}})
           results (run-simulation config)]
       (is (every? some? results)))))
