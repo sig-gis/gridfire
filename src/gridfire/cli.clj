@@ -106,10 +106,11 @@
   [rand-generator n perturbations]
   (when perturbations
    (mapv
-    #(reduce-kv (fn [acc k {:keys [spatial-type pdf-min pdf-max] :as v}]
-                  (let [simulation-id %]
+    #(reduce-kv (fn [acc k {:keys [spatial-type range] :as v}]
+                  (let [simulation-id     %
+                        [min-val max-val] range]
                     (if (= spatial-type :global)
-                      (update-in acc [k] assoc :global-value  (random-float pdf-min pdf-max rand-generator))
+                      (update-in acc [k] assoc :global-value  (random-float min-val max-val rand-generator))
                       (update-in acc [k] merge {:simulation-id  simulation-id
                                                 :rand-generator rand-generator}))))
                 perturbations

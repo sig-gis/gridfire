@@ -1926,13 +1926,14 @@ pseudo-code lays out the steps taken in this procedure:
     (m/mget raster band i j)))
 
 (defn perturb-landfire-at
-  [{:keys [spatial-type pdf-min pdf-max global-value rand-generator]}
+  [{:keys [spatial-type range global-value rand-generator]}
    matrix
    [i j]]
-  (let [value-here (m/mget matrix i j)]
-   (if (= spatial-type :global)
-     (+ value-here global-value)
-     (+ value-here (random-float pdf-min pdf-max rand-generator)))))
+  (let [value-here        (m/mget matrix i j)
+        [min-val max-val] range]
+    (if (= spatial-type :global)
+      (+ value-here global-value)
+      (+ value-here (random-float min-val max-val rand-generator)))))
 
 (def perturb-landfire-at
   (memoize perturb-landfire-at))
@@ -2629,10 +2630,11 @@ or false:
   [rand-generator n perturbations]
   (when perturbations
    (mapv
-    #(reduce-kv (fn [acc k {:keys [spatial-type pdf-min pdf-max] :as v}]
-                  (let [simulation-id %]
+    #(reduce-kv (fn [acc k {:keys [spatial-type range] :as v}]
+                  (let [simulation-id     %
+                        [min-val max-val] range]
                     (if (= spatial-type :global)
-                      (update-in acc [k] assoc :global-value  (random-float pdf-min pdf-max rand-generator))
+                      (update-in acc [k] assoc :global-value  (random-float min-val max-val rand-generator))
                       (update-in acc [k] merge {:simulation-id  simulation-id
                                                 :rand-generator rand-generator}))))
                 perturbations
@@ -3171,18 +3173,15 @@ multiples of one another.
 ** Section 6: Perturbations
 
 Gridfire supports puturbations of input rasters during simulations in order to account
-for inherent uncertainty in the data. A random sampling procedure is implemented such that
-the spatial perturbation to be applied to a given input raster sampled from a
-probability density function (pdf). Currenlty only a uniform distribution is supported.
+for inherent uncertainty in the data. A uniform random sampling of values within a given
+range is used to address these uncertanties.
 
 To specify this in the config file include the following mappings:
-
 *perturbations:* a map of layer names to a map of perturbation configurations
 
 #+begin_src clojure
 {:perturbations {:canopy-height {:spatial-type :global
-                                 :pdf-min      -1.0
-                                 :pdf-max      1.0}}}
+                                 :range        [-1.0 1.0]}}}
 #+end_src
 
 The above config specify that a randomly selected value between -1.0 and 1.0 should be added

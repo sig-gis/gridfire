@@ -158,13 +158,14 @@
     (m/mget raster band i j)))
 
 (defn perturb-landfire-at
-  [{:keys [spatial-type pdf-min pdf-max global-value rand-generator]}
+  [{:keys [spatial-type range global-value rand-generator]}
    matrix
    [i j]]
-  (let [value-here (m/mget matrix i j)]
-   (if (= spatial-type :global)
-     (+ value-here global-value)
-     (+ value-here (random-float pdf-min pdf-max rand-generator)))))
+  (let [value-here        (m/mget matrix i j)
+        [min-val max-val] range]
+    (if (= spatial-type :global)
+      (+ value-here global-value)
+      (+ value-here (random-float min-val max-val rand-generator)))))
 
 (def perturb-landfire-at
   (memoize perturb-landfire-at))
