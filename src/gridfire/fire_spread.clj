@@ -161,23 +161,23 @@
   [{:keys [spatial-type range global-value rand-generator]}
    matrix
    [i j]]
-  (let [value-here        (m/mget matrix i j)
-        [min-val max-val] range]
-    (if (= spatial-type :global)
-      (+ value-here global-value)
-      (+ value-here (random-float min-val max-val rand-generator)))))
+  (let [[min-val max-val] range]
+    (if (and (= spatial-type :global) global-value)
+      global-value
+      (random-float min-val max-val rand-generator))))
 
 (def perturb-landfire-at
   (memoize perturb-landfire-at))
 
 (defn sample-landfire-at
   [perturbation-info matrix [i j :as here]]
-  (if perturbation-info
-    (perturb-landfire-at perturbation-info matrix here)
-    (m/mget matrix i j)))
+  (let [value-here (m/mget matrix i j)]
+   (if perturbation-info
+     (+ value-here (perturb-landfire-at perturbation-info matrix here))
+     value-here)))
 
-(defn fuel-moisture [temperature relative-humidity]
-  (let [equilibrium-moisture (calc-emc rh tmp)]
+(defn fuel-moisture [relative-humidity temperature]
+  (let [equilibrium-moisture (calc-emc relative-humidity temperature)]
     {:dead {:1hr   (+ equilibrium-moisture 0.002)
             :10hr  (+ equilibrium-moisture 0.015)
             :100hr (+ equilibrium-moisture 0.025)}
@@ -240,13 +240,12 @@
           canopy-height
           crown-bulk-density
           fuel-model-number
-          fuel-moisture
-          relative-humididty
+          relative-humidity
           slope
           temperature
           wind-from-direction
           wind-speed-20ft]}          (extract-constants constants global-clock here)
-        fuel-moisture                (fuel-moisture temperature relative-humidity)
+        fuel-moisture                (fuel-moisture relative-humidity temperature)
         [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model-number fuel-moisture)
         midflame-wind-speed          (* wind-speed-20ft 88.0
                                         (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
