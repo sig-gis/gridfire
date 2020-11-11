@@ -1926,13 +1926,12 @@ pseudo-code lays out the steps taken in this procedure:
     (m/mget raster band i j)))
 
 (defn perturb-landfire-at
-  [{:keys [spatial-type range global-value rand-generator]}
+  [{:keys [range global-value rand-generator]}
    matrix
    [i j]]
   (let [[min-val max-val] range]
-    (if (and (= spatial-type :global) global-value)
-      global-value
-      (random-float min-val max-val rand-generator))))
+    (or global-value
+        (random-float min-val max-val rand-generator))))
 
 (def perturb-landfire-at
   (memoize perturb-value-at))
