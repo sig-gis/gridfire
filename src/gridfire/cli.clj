@@ -203,7 +203,8 @@
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
                                       :num-cols                  (m/row-count (:fuel-model landfire-rasters))
                                       :multiplier-lookup         multiplier-lookup
-                                      :perturbations             (perturbations i)}
+                                      :perturbations             (when perturbations
+                                                                     (perturbations i))}
                                      initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
