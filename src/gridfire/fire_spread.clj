@@ -176,20 +176,8 @@
     (perturb-landfire-at perturbation-info matrix here)
     (m/mget matrix i j)))
 
-(defn fuel-moisture [here temperature relative-humidity global-clock multiplier-lookup]
-  (let [tmp                  (if (v/vectorz? temperature)
-                               (sample-weather-at here
-                                          global-clock
-                                          temperature
-                                          (:temperature multiplier-lookup))
-                               temperature)
-        rh                   (if (v/vectorz? relative-humidity)
-                               (sample-weather-at here
-                                          global-clock
-                                          relative-humidity
-                                          (:relative-humidity multiplier-lookup))
-                               relative-humidity)
-        equilibrium-moisture (calc-emc rh tmp)]
+(defn fuel-moisture [temperature relative-humidity]
+  (let [equilibrium-moisture (calc-emc rh tmp)]
     {:dead {:1hr   (+ equilibrium-moisture 0.002)
             :10hr  (+ equilibrium-moisture 0.015)
             :100hr (+ equilibrium-moisture 0.025)}
@@ -205,17 +193,28 @@
                 canopy-cover fuel-model]} landfire-layers]
     {:wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
                             (sample-weather-at here
-                                       global-clock
-                                       wind-speed-20ft
-                                       (:wind-speed-20ft multiplier-lookup))
+                                               global-clock
+                                               wind-speed-20ft
+                                               (:wind-speed-20ft multiplier-lookup))
                             wind-speed-20ft)
      :wind-from-direction (if (v/vectorz? wind-from-direction)
                             (sample-weather-at here
-                                       global-clock
-                                       wind-from-direction
-                                       (:wind-from-direction multiplier-lookup))
+                                               global-clock
+                                               wind-from-direction
+                                               (:wind-from-direction multiplier-lookup))
                             wind-from-direction)
-     :fuel-moisture       (fuel-moisture here temperature relative-humidity global-clock multiplier-lookup)
+     :temperature         (if (v/vectorz? temperature)
+                            (sample-weather-at here
+                                               global-clock
+                                               temperature
+                                               (:temperature multiplier-lookup))
+                            temperature)
+     :relative-humidity   (if (v/vectorz? relative-humidity)
+                            (sample-weather-at here
+                                               global-clock
+                                               relative-humidity
+                                               (:relative-humidity multiplier-lookup))
+                            relative-humidity)
      :fuel-model-number   (sample-landfire-at (:fuel-model perturbations) fuel-model here)
      :slope               (m/mget slope i j)
      :aspect              (m/mget aspect i j)
@@ -235,18 +234,22 @@
    overflow-heat
    global-clock]
   (let [{:keys
-         [wind-speed-20ft
-          wind-from-direction
-          fuel-moisture
-          fuel-model-number
-          slope
-          aspect
-          canopy-height
+         [aspect
           canopy-base-height
+          canopy-cover
+          canopy-height
           crown-bulk-density
-          canopy-cover]}             (extract-constants constants global-clock here)
+          fuel-model-number
+          fuel-moisture
+          relative-humididty
+          slope
+          temperature
+          wind-from-direction
+          wind-speed-20ft]}          (extract-constants constants global-clock here)
+        fuel-moisture                (fuel-moisture temperature relative-humidity)
         [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model-number fuel-moisture)
-        midflame-wind-speed          (* wind-speed-20ft 88.0 (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
+        midflame-wind-speed          (* wind-speed-20ft 88.0
+                                        (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
         spread-info-max              (rothermel-surface-fire-spread-max spread-info-min
                                                                         midflame-wind-speed
                                                                         wind-from-direction
