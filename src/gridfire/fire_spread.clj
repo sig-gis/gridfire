@@ -167,7 +167,7 @@
       (random-float min-val max-val rand-generator))))
 
 (def perturb-landfire-at
-  (memoize perturb-landfire-at))
+  (memoize perturb-value-at))
 
 (defn sample-landfire-at
   [perturbation-info matrix [i j :as here]]
