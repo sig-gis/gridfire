@@ -43,10 +43,10 @@
                      config/parse)
         results (config/extract-perturbations config)]
 
-    (is (= {:canopy-bulk-density {:spatial-type :global :pdf-min -0.05 :pdf-max 0.05}
-            :canopy-base-height  {:spatial-type :global :pdf-min -2.0 :pdf-max 2.0}
-            :canopy-cover        {:spatial-type :global :pdf-min -0.05 :pdf-max 0.05}
-            :canopy-height       {:spatial-type :global :pdf-min -5.0 :pdf-max 5.0}}
+    (is (= {:canopy-bulk-density {:spatial-type :global :range [-0.05 0.05]}
+            :canopy-base-height  {:spatial-type :global :range [-2.0 2.0]}
+            :canopy-cover        {:spatial-type :global :range [-0.05 0.05]}
+            :canopy-height       {:spatial-type :global :range [-5.0 5.0]}}
            results))))
 
 (deftest read-data-test
