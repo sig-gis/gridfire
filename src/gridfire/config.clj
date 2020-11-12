@@ -125,10 +125,8 @@
   {:spatial-type (->> (str/join "-" ["SPATIAL_PERTURBATION" index])
                       (get config)
                       (get elmfire->gridfire))
-   :pdf-min      (->> (str/join "-" ["PDF_LOWER_LIMIT" index])
-                      (get config))
-   :pdf-max      (->> (str/join "-" ["PDF_UPPER_LIMIT" index])
-                      (get config))})
+   :range        [(get config (str/join "-" ["PDF_LOWER_LIMIT" index]))
+                  (get config (str/join "-" ["PDF_UPPER_LIMIT" index]))]})
 
 (defn perturbation-key [config index]
   (->> (str/join "-" ["RASTER_TO_PERTURB" index])
