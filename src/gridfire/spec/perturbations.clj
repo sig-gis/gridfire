@@ -20,6 +20,10 @@
 (s/def ::crown-bulk-density ::pdf-info)
 (s/def ::canopy-cover ::pdf-info)
 (s/def ::fuel-model ::pdf-info)
+(s/def ::wind-speed-20ft ::pdf-info)
+(s/def ::wind-direction ::pdf-info)
+(s/def ::relative-humidity ::pdf-info)
+(s/def ::temperature ::pdf-info)
 
 (defmacro one-or-more-keys [ks]
   (let [keyset (set (map (comp keyword name) ks))]
@@ -31,4 +35,8 @@
                      ::canopy-base-height
                      ::crown-bulk-density
                      ::canopy-cover
-                     ::fuel-model]))
+                     ::fuel-model
+                     ::wind-speed-20ft
+                     ::wind-direction
+                     ::relative-humidity
+                     ::temperature]))

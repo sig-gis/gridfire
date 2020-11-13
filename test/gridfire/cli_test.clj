@@ -306,6 +306,10 @@
         (is (= {:temperature       10
                 :relative-humidity 10} lookup))))))
 
+;;-----------------------------------------------------------------------------
+;; Perturbation Tests
+;;-----------------------------------------------------------------------------
+
 (deftest run-simulation-with-landfire-perturbations
   (testing "with global perturbation value"
     (let [config  (merge test-config-base
