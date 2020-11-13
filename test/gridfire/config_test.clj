@@ -43,7 +43,7 @@
                      config/parse)
         results (config/extract-perturbations config)]
 
-    (is (= {:canopy-bulk-density {:spatial-type :global :range [-0.05 0.05]}
+    (is (= {:crown-bulk-density {:spatial-type :global :range [-0.05 0.05]}
             :canopy-base-height  {:spatial-type :global :range [-2.0 2.0]}
             :canopy-cover        {:spatial-type :global :range [-0.05 0.05]}
             :canopy-height       {:spatial-type :global :range [-5.0 5.0]}}
@@ -81,7 +81,7 @@
                    :output-csvs?              false
                    :output-pngs?              false
                    :output-landfire-inputs?   false
-                   :perturbations             {:canopy-bulk-density {:spatial-type :global
+                   :perturbations             {:crown-bulk-density {:spatial-type :global
                                                                      :range        [-0.05 0.05]}
                                                :canopy-base-height  {:spatial-type :global
                                                                      :range        [-2.0 2.0]}
