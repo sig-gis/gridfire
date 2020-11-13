@@ -9,7 +9,10 @@
 
 (s/def ::range (s/coll-of float? :kind vector? :count 2))
 
-(s/def ::pdf-info (s/and (s/keys :req-un [::spatial-type ::range])
+(s/def ::frequency int?)
+
+(s/def ::pdf-info (s/and (s/keys :req-un [::spatial-type ::range]
+                                 :opt-un [::frequency])
                          ::valid-range))
 
 (s/def ::canopy-height ::pdf-info)

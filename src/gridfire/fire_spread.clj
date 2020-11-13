@@ -14,6 +14,7 @@
                                            rothermel-surface-fire-spread-max
                                            rothermel-surface-fire-spread-no-wind-no-slope
                                            wind-adjustment-factor]]
+            [gridfire.perturbation :as perturbation]
             [gridfire.utils.random :refer [random-float]]
             [mikera.vectorz.core :as v]))
 
@@ -150,30 +151,26 @@
      30))
 
 (defn sample-weather-at
-  [here global-clock raster multiplier]
-  (let [[i j] (if multiplier
-                (map #(quot % multiplier) here)
-                here)
-        band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
-    (m/mget raster band i j)))
-
-(defn perturb-landfire-at
-  [{:keys [range global-value rand-generator]}
-   matrix
-   [i j]]
-  (let [[min-val max-val] range]
-    (or global-value
-        (random-float min-val max-val rand-generator))))
-
-(def perturb-landfire-at
-  (memoize perturb-landfire-at))
+  [here global-clock raster multiplier perturb-info]
+  (let [[i j]      (if multiplier
+                     (map #(quot % multiplier) here)
+                     here)
+        band       (int (quot global-clock 60.0))
+        value-here (m/mget raster band i j)] ;; Assuming each band is 1 hour
+    (if perturb-info
+      (if-let [freq (:frequency perturb-info)]
+        (+ value-here (perturbation/value-at perturb-info raster here (quot global-clock freq)))
+        (+ value-here (perturbation/value-at perturb-info raster here)))
+      value-here)))
 
 (defn sample-landfire-at
-  [perturbation-info matrix [i j :as here]]
+  [[i j :as here] global-clock matrix perturb-info]
   (let [value-here (m/mget matrix i j)]
-   (if perturbation-info
-     (+ value-here (perturb-landfire-at perturbation-info matrix here))
-     value-here)))
+    (if perturb-info
+      (if-let [freq (:frequency perturb-info)]
+        (+ value-here (perturbation/value-at perturb-info raster here (quot global-clock freq)))
+        (+ value-here (perturbation/value-at perturb-info raster here)))
+      value-here)))
 
 (defn fuel-moisture [relative-humidity temperature]
   (let [equilibrium-moisture (calc-emc relative-humidity temperature)]
@@ -184,8 +181,9 @@
             :woody      (* equilibrium-moisture 0.5)}}))
 
 (defn extract-constants
-  [{:keys [landfire-layers wind-speed-20ft wind-from-direction temperature relative-humidity
-           foliar-moisture ellipse-adjustment-factor multiplier-lookup perturbations]}
+  [{:keys [landfire-layers wind-speed-20ft wind-from-direction temperature
+           relative-humidity foliar-moisture ellipse-adjustment-factor
+           multiplier-lookup perturbations]}
    global-clock
    [i j :as here]]
   (let [{:keys [slope aspect canopy-height canopy-base-height crown-bulk-density
@@ -194,33 +192,37 @@
                             (sample-weather-at here
                                                global-clock
                                                wind-speed-20ft
-                                               (:wind-speed-20ft multiplier-lookup))
+                                               (:wind-speed-20ft multiplier-lookup)
+                                               (:wind-speed-20ft perturbations))
                             wind-speed-20ft)
      :wind-from-direction (if (v/vectorz? wind-from-direction)
                             (sample-weather-at here
                                                global-clock
                                                wind-from-direction
-                                               (:wind-from-direction multiplier-lookup))
+                                               (:wind-from-direction multiplier-lookup)
+                                               (:wind-from-direction perturbations))
                             wind-from-direction)
      :temperature         (if (v/vectorz? temperature)
                             (sample-weather-at here
                                                global-clock
                                                temperature
-                                               (:temperature multiplier-lookup))
+                                               (:temperature multiplier-lookup)
+                                               (:temperature perturbations))
                             temperature)
      :relative-humidity   (if (v/vectorz? relative-humidity)
                             (sample-weather-at here
                                                global-clock
                                                relative-humidity
-                                               (:relative-humidity multiplier-lookup))
+                                               (:relative-humidity multiplier-lookup)
+                                               (:relative-humidity perturbations))
                             relative-humidity)
      :fuel-model-number   (sample-landfire-at (:fuel-model perturbations) fuel-model here)
      :slope               (m/mget slope i j)
      :aspect              (m/mget aspect i j)
-     :canopy-height       (sample-landfire-at (:canopy-height perturbations) canopy-height here)
-     :canopy-base-height  (sample-landfire-at (:canopy-base-height perturbations) canopy-base-height here)
-     :crown-bulk-density  (sample-landfire-at (:crown-bulk-density perturbations) crown-bulk-density here)
-     :canopy-cover        (sample-landfire-at (:canopy-cover perturbations) canopy-cover here)}))
+     :canopy-height       (sample-landfire-at here global-clock canopy-height (:canopy-height perturbations))
+     :canopy-base-height  (sample-landfire-at here global-clock canopy-base-height (:canopy-base-height perturbations))
+     :crown-bulk-density  (sample-landfire-at here global-clock crown-bulk-density (:crown-bulk-density perturbations))
+     :canopy-cover        (sample-landfire-at here global-clock canopy-cover (:canopy-cover perturbations))}))
 
 (defn compute-neighborhood-fire-spread-rates!
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
@@ -347,7 +349,8 @@
             timestep        (if (> (+ global-clock dt) max-runtime)
                               (- max-runtime global-clock)
                               dt)
-            ignition-events (identify-ignition-events ignited-cells timestep)]
+            ignition-events (identify-ignition-events ignited-cells timestep)
+            constants       (perturbation/update-global-vals constants global-clock (+ global-clock timestep))]
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
         (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]

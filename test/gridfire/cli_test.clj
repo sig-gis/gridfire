@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [gridfire.cli :as cli]
             [gridfire.fetch :as fetch]
+            [gridfire.perturbation :as perturbation]
             [gridfire.crown-fire :refer [m->ft]])
   (:import java.util.Random))
 
@@ -74,7 +75,7 @@
      (cli/draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
      ignition-raster
      multiplier-lookup
-     (cli/draw-perturbation-samples rand-generator simulations (:perturbations config)))))
+     (perturbation/draw-samples rand-generator simulations (:perturbations config)))))
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
