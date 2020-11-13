@@ -10,6 +10,7 @@
            [min-val max-val] range]
        (if (= spatial-type :global)
          (update-in acc [k] merge {:global-value   (random-float min-val max-val rand-generator)
+                                   :simulation-id  simulation-id
                                    :rand-generator rand-generator})
          (update-in acc [k] merge {:simulation-id  simulation-id
                                    :rand-generator rand-generator}))))
