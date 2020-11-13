@@ -168,8 +168,8 @@
   (let [value-here (m/mget matrix i j)]
     (if perturb-info
       (if-let [freq (:frequency perturb-info)]
-        (+ value-here (perturbation/value-at perturb-info raster here (quot global-clock freq)))
-        (+ value-here (perturbation/value-at perturb-info raster here)))
+        (+ value-here (perturbation/value-at perturb-info matrix here (quot global-clock freq)))
+        (+ value-here (perturbation/value-at perturb-info matrix here)))
       value-here)))
 
 (defn fuel-moisture [relative-humidity temperature]
