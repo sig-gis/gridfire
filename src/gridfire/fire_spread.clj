@@ -216,7 +216,7 @@
                                                (:relative-humidity multiplier-lookup)
                                                (:relative-humidity perturbations))
                             relative-humidity)
-     :fuel-model-number   (sample-landfire-at (:fuel-model perturbations) fuel-model here)
+     :fuel-model-number   (sample-landfire-at here global-clock fuel-model (:fuel-model perturbations))
      :slope               (m/mget slope i j)
      :aspect              (m/mget aspect i j)
      :canopy-height       (sample-landfire-at here global-clock canopy-height (:canopy-height perturbations))
