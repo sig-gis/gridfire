@@ -1932,11 +1932,13 @@ pseudo-code lays out the steps taken in this procedure:
       value-here)))
 
 (defn sample-landfire-at
-  [perturb-info matrix [i j :as here]]
+  [[i j :as here] global-clock matrix perturb-info]
   (let [value-here (m/mget matrix i j)]
-   (if perturb-info
-     (+ value-here (perturbation/value-at perturb-info matrix here))
-     value-here)))
+    (if perturb-info
+      (if-let [freq (:frequency perturb-info)]
+        (+ value-here (perturbation/value-at perturb-info matrix here (quot global-clock freq)))
+        (+ value-here (perturbation/value-at perturb-info matrix here)))
+      value-here)))
 
 (defn fuel-moisture [relative-humidity temperature]
   (let [equilibrium-moisture (calc-emc relative-humidity temperature)]
@@ -1982,13 +1984,13 @@ pseudo-code lays out the steps taken in this procedure:
                                                (:relative-humidity multiplier-lookup)
                                                (:relative-humidity perturbations))
                             relative-humidity)
-     :fuel-model-number   (sample-landfire-at (:fuel-model perturbations) fuel-model here)
+     :fuel-model-number   (sample-landfire-at here global-clock fuel-model (:fuel-model perturbations))
      :slope               (m/mget slope i j)
      :aspect              (m/mget aspect i j)
-     :canopy-height       (sample-landfire-at (:canopy-height perturbations) canopy-height here)
-     :canopy-base-height  (sample-landfire-at (:canopy-base-height perturbations) canopy-base-height here)
-     :crown-bulk-density  (sample-landfire-at (:crown-bulk-density perturbations) crown-bulk-density here)
-     :canopy-cover        (sample-landfire-at (:canopy-cover perturbations) canopy-cover here)}))
+     :canopy-height       (sample-landfire-at here global-clock canopy-height (:canopy-height perturbations))
+     :canopy-base-height  (sample-landfire-at here global-clock canopy-base-height (:canopy-base-height perturbations))
+     :crown-bulk-density  (sample-landfire-at here global-clock crown-bulk-density (:crown-bulk-density perturbations))
+     :canopy-cover        (sample-landfire-at here global-clock canopy-cover (:canopy-cover perturbations))}))
 
 (defn compute-neighborhood-fire-spread-rates!
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],

@@ -307,9 +307,16 @@
                 :relative-humidity 10} lookup))))))
 
 (deftest run-simulation-with-landfire-perturbations
-  (testing "perturbing canopy height landfire layer"
+  (testing "with global perturbation value"
     (let [config  (merge test-config-base
                          {:perturbations {:canopy-height {:spatial-type :global
                                                           :range [-1.0 1.0]}}})
+          results (run-simulation config)]
+      (is (every? some? results))))
+
+  (testing "with pixel by pixel perturbation"
+    (let [config  (merge test-config-base
+                         {:perturbations {:canopy-height {:spatial-type :pixel
+                                                          :range        [-1.0 1.0]}}})
           results (run-simulation config)]
       (is (every? some? results)))))
