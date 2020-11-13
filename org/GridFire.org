@@ -1782,6 +1782,7 @@ pseudo-code lays out the steps taken in this procedure:
                                            rothermel-surface-fire-spread-max
                                            rothermel-surface-fire-spread-no-wind-no-slope
                                            wind-adjustment-factor]]
+            [gridfire.perturbation :as perturbation]
             [gridfire.utils.random :refer [random-float]]
             [mikera.vectorz.core :as v]))
 
@@ -1918,29 +1919,23 @@ pseudo-code lays out the steps taken in this procedure:
      30))
 
 (defn sample-weather-at
-  [here global-clock raster multiplier]
-  (let [[i j] (if multiplier
-                (map #(quot % multiplier) here)
-                here)
-        band  (int (quot global-clock 60.0))] ;; Assuming each band is 1 hour
-    (m/mget raster band i j)))
-
-(defn perturb-landfire-at
-  [{:keys [range global-value rand-generator]}
-   matrix
-   [i j]]
-  (let [[min-val max-val] range]
-    (or global-value
-        (random-float min-val max-val rand-generator))))
-
-(def perturb-landfire-at
-  (memoize perturb-landfire-at))
+  [here global-clock raster multiplier perturb-info]
+  (let [[i j]      (if multiplier
+                     (map #(quot % multiplier) here)
+                     here)
+        band       (int (quot global-clock 60.0))
+        value-here (m/mget raster band i j)] ;; Assuming each band is 1 hour
+    (if perturb-info
+      (if-let [freq (:frequency perturb-info)]
+        (+ value-here (perturbation/value-at perturb-info raster here (quot global-clock freq)))
+        (+ value-here (perturbation/value-at perturb-info raster here)))
+      value-here)))
 
 (defn sample-landfire-at
-  [perturbation-info matrix [i j :as here]]
+  [perturb-info matrix [i j :as here]]
   (let [value-here (m/mget matrix i j)]
-   (if perturbation-info
-     (+ value-here (perturb-landfire-at perturbation-info matrix here))
+   (if perturb-info
+     (+ value-here (perturbation/value-at perturb-info matrix here))
      value-here)))
 
 (defn fuel-moisture [relative-humidity temperature]
@@ -1952,8 +1947,9 @@ pseudo-code lays out the steps taken in this procedure:
             :woody      (* equilibrium-moisture 0.5)}}))
 
 (defn extract-constants
-  [{:keys [landfire-layers wind-speed-20ft wind-from-direction temperature relative-humidity
-           foliar-moisture ellipse-adjustment-factor multiplier-lookup perturbations]}
+  [{:keys [landfire-layers wind-speed-20ft wind-from-direction temperature
+           relative-humidity foliar-moisture ellipse-adjustment-factor
+           multiplier-lookup perturbations]}
    global-clock
    [i j :as here]]
   (let [{:keys [slope aspect canopy-height canopy-base-height crown-bulk-density
@@ -1962,25 +1958,29 @@ pseudo-code lays out the steps taken in this procedure:
                             (sample-weather-at here
                                                global-clock
                                                wind-speed-20ft
-                                               (:wind-speed-20ft multiplier-lookup))
+                                               (:wind-speed-20ft multiplier-lookup)
+                                               (:wind-speed-20ft perturbations))
                             wind-speed-20ft)
      :wind-from-direction (if (v/vectorz? wind-from-direction)
                             (sample-weather-at here
                                                global-clock
                                                wind-from-direction
-                                               (:wind-from-direction multiplier-lookup))
+                                               (:wind-from-direction multiplier-lookup)
+                                               (:wind-from-direction perturbations))
                             wind-from-direction)
      :temperature         (if (v/vectorz? temperature)
                             (sample-weather-at here
                                                global-clock
                                                temperature
-                                               (:temperature multiplier-lookup))
+                                               (:temperature multiplier-lookup)
+                                               (:temperature perturbations))
                             temperature)
      :relative-humidity   (if (v/vectorz? relative-humidity)
                             (sample-weather-at here
                                                global-clock
                                                relative-humidity
-                                               (:relative-humidity multiplier-lookup))
+                                               (:relative-humidity multiplier-lookup)
+                                               (:relative-humidity perturbations))
                             relative-humidity)
      :fuel-model-number   (sample-landfire-at (:fuel-model perturbations) fuel-model here)
      :slope               (m/mget slope i j)
@@ -2115,7 +2115,8 @@ pseudo-code lays out the steps taken in this procedure:
             timestep        (if (> (+ global-clock dt) max-runtime)
                               (- max-runtime global-clock)
                               dt)
-            ignition-events (identify-ignition-events ignited-cells timestep)]
+            ignition-events (identify-ignition-events ignited-cells timestep)
+            constants       (perturbation/update-global-vals constants global-clock (+ global-clock timestep))]
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
         (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]
@@ -2539,6 +2540,7 @@ or false:
             [gridfire.surface-fire :refer [degrees-to-radians]]
             [gridfire.spec.config :as spec]
             [gridfire.utils.random :refer [my-rand-int my-rand-nth random-float]]
+            [gridfire.perturbation :as perturbation]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
                                    register-new-crs-definitions-from-properties-file!
@@ -2627,21 +2629,6 @@ or false:
               (vector? x) (sample-from-range rand-generator n x)
               :else       (repeat n x))))
 
-(defn draw-perturbation-samples
-  [rand-generator n perturbations]
-  (when perturbations
-   (mapv
-    #(reduce-kv (fn [acc k {:keys [spatial-type range] :as v}]
-                  (let [simulation-id     %
-                        [min-val max-val] range]
-                    (if (= spatial-type :global)
-                      (update-in acc [k] assoc :global-value  (random-float min-val max-val rand-generator))
-                      (update-in acc [k] merge {:simulation-id  simulation-id
-                                                :rand-generator rand-generator}))))
-                perturbations
-                perturbations)
-    (range n))))
-
 (defn cells-to-acres
   [cell-size num-cells]
   (let [acres-per-cell (/ (* cell-size cell-size) 43560.0)]
@@ -2729,7 +2716,7 @@ or false:
                                       :num-cols                  (m/row-count (:fuel-model landfire-rasters))
                                       :multiplier-lookup         multiplier-lookup
                                       :perturbations             (when perturbations
-                                                                     (perturbations i))}
+                                                                  (perturbations i))}
                                      initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
@@ -2870,7 +2857,7 @@ or false:
                 (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
                 ignition-raster
                 multiplier-lookup
-                (draw-perturbation-samples rand-generator simulations (:perturbations config)))
+                (perturbation/draw-samples rand-generator simulations (:perturbations config)))
                (write-csv-outputs
                 (:output-csvs? config)
                 (str "summary_stats" (:outfile-suffix config) ".csv"))))
@@ -3190,6 +3177,72 @@ The above config specify that a randomly selected value between -1.0 and 1.0 sho
 to the canopy height value. This perturbation will be applied globally to all cells
 `{:spatial-type :global}`. We could also specify that each cell should be perturbed individually
 by setting `{:spatial-type :pixel}.
+
+ #+name: perturbation
+#+begin_src clojure :results silent :exports code :tangle ../src/gridfire/perturbation.clj :padline no :no-expand :comments link
+(ns gridfire.perturbation
+  (:require [gridfire.utils.random :refer [random-float]]))
+
+(defn- enrich-info
+  [perturbations rand-generator id]
+  (reduce-kv
+   (fn [acc k {:keys [spatial-type range rand-gen] :as v}]
+     (let [simulation-id     id
+           [min-val max-val] range]
+       (if (= spatial-type :global)
+         (update-in acc [k] merge {:global-value   (random-float min-val max-val rand-generator)
+                                   :rand-generator rand-generator})
+         (update-in acc [k] merge {:simulation-id  simulation-id
+                                   :rand-generator rand-generator}))))
+   perturbations
+   perturbations))
+
+(defn draw-samples
+  [rand-generator n perturbations]
+  (when perturbations
+    (mapv #(enrich-info perturbations rand-generator %) (range n))))
+
+(defn value-at
+  ([perturb-info matrix here]
+   (value-at perturb-info matrix here nil))
+
+  ([{:keys [range spatial-type global-value rand-generator]} matrix here frequency-band]
+   (let [[min-val max-val] range]
+     (if (= spatial-type :global)
+       global-value
+       (random-float min-val max-val rand-generator)))))
+
+(def value-at
+  (memoize value-at))
+
+(defn- update?
+  [global-clock next-clock frequency]
+  (< (quot global-clock frequency)
+     (quot next-clock frequency)))
+
+(defn- global-temporal-perturbations
+  [perturbations]
+  (->> perturbations
+       (filter (fn [[k v]] (and (:frequency v) (= (:spatial-type v) :global))))
+       keys))
+
+(defn update-global-vals
+  [{:keys [perturbations] :as constants} current-clock next-clock]
+  (let [layers-to-update (global-temporal-perturbations perturbations)]
+    (reduce
+     (fn [acc layer-name]
+       (let [{:keys [frequency
+                     range
+                     rand-generator]} (get-in acc [:perturbations layer-name])
+             [min-val max-val]        range
+             new-global               (random-float min-val max-val rand-generator)]
+         (if (update? current-clock next-clock frequency)
+           (assoc-in acc [:perturbations layer-name :global-value] new-global)
+           acc)))
+     constants
+     layers-to-update)))
+
+#+end_src
 
 * Example Configuration files
 
