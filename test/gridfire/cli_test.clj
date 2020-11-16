@@ -53,12 +53,13 @@
 
 (defn run-simulation [config]
   (let [simulations       (:simulations config)
-        multiplier-lookup (cli/create-multiplier-lookup config)
         rand-generator    (if-let [seed (:random-seed config)]
                             (Random. seed)
                             (Random.))
         landfire-layers   (cli/fetch-landfire-layers config)
         landfire-matrix   (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
+        weather-layers    (cli/fetch-weather-layers config)
+        multiplier-lookup (cli/create-multiplier-lookup config weather-layers)
         ignition-raster   (fetch/initial-ignition-layers config)]
     (cli/run-simulations
      config
@@ -67,10 +68,10 @@
      (cli/draw-samples rand-generator simulations (:ignition-row config))
      (cli/draw-samples rand-generator simulations (:ignition-col config))
      (cli/draw-samples rand-generator simulations (:max-runtime config))
-     (cli/get-weather config rand-generator :temperature)
-     (cli/get-weather config rand-generator :relative-humidity)
-     (cli/get-weather config rand-generator :wind-speed-20ft)
-     (cli/get-weather config rand-generator :wind-from-direction)
+     (cli/get-weather config rand-generator :temperature weather-layers)
+     (cli/get-weather config rand-generator :relative-humidity weather-layers)
+     (cli/get-weather config rand-generator :wind-speed-20ft weather-layers)
+     (cli/get-weather config rand-generator :wind-from-direction weather-layers)
      (cli/draw-samples rand-generator simulations (:foliar-moisture config))
      (cli/draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
      ignition-raster
@@ -279,8 +280,7 @@
                           :fetch-layer-method       :geotiff
                           :landfire-layers          landfire-layers-weather-test
                           :fetch-temperature-method :geotiff
-                          :temperature              {:path      (in-file-path "weather-test/tmpf_to_sample_lower_res.tif")
-                                                     :cell-size (m->ft 300)}})
+                          :temperature              (in-file-path "weather-test/tmpf_to_sample_lower_res.tif")})
           results (run-simulation config)]
 
       (is (every? some? results)))))
@@ -288,23 +288,13 @@
 (deftest multiplier-lookup-test
   (testing "constructing multiplier lookup for weather rasters"
     (testing "with single weather raster"
-      (let [config {:cell-size   (m->ft 30)
-                    :temperature {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
-                                  :cell-size (m->ft 300)}}
-            lookup (cli/create-multiplier-lookup config)]
+      (let [config         {:cell-size                (m->ft 30)
+                            :fetch-temperature-method :geotiff
+                            :temperature              (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")}
+            weather-layers (cli/fetch-weather-layers config)
+            lookup         (cli/create-multiplier-lookup config weather-layers)]
 
-        (is (= {:temperature 10} lookup))))
-
-    (testing "with multiple weather rasters"
-      (let [config {:cell-size         (m->ft 30)
-                    :temperature       {:path      (in-file-path "/weather-test/tmpf_to_sample_lower_res.tif")
-                                        :cell-size (m->ft 300)}
-                    :relative-humidity {:path      (in-file-path "/weather-test/rh_to_sample_lower_res.tif")
-                                        :cell-size (m->ft 300)}}
-            lookup (cli/create-multiplier-lookup config)]
-
-        (is (= {:temperature       10
-                :relative-humidity 10} lookup))))))
+        (is (= {:temperature 10} lookup))))))
 
 ;;-----------------------------------------------------------------------------
 ;; Perturbation Tests
