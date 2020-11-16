@@ -219,11 +219,11 @@
 (deftest run-simulation-using-relative-humidity-raster-test
   (testing "Running simulation using relative humidity data from geotiff file"
     (let [config  (merge test-config-base
-                         {:fetch-layer-method       :geotiff
-                          :landfire-layers          landfire-layers-weather-test
-                          :max-runtime              120
-                          :fetch-temperature-method :geotiff
-                          :temperature              (in-file-path "weather-test/rh_to_sample.tif")})
+                         {:fetch-layer-method             :geotiff
+                          :landfire-layers                landfire-layers-weather-test
+                          :max-runtime                    120
+                          :fetch-relative-humidity-method :geotiff
+                          :relative-humidity              (in-file-path "weather-test/rh_to_sample.tif")})
           results (run-simulation config)]
 
       (is (every? some? results)))))
@@ -231,11 +231,11 @@
 (deftest run-simulation-using-wind-speed-raster-test
   (testing "Running simulation using wind speed data from geotiff file"
     (let [config  (merge test-config-base
-                         {:fetch-layer-method       :geotiff
-                          :landfire-layers          landfire-layers-weather-test
-                          :max-runtime              120
-                          :fetch-temperature-method :geotiff
-                          :temperature              (in-file-path "weather-test/ws_to_sample.tif")})
+                         {:fetch-layer-method           :geotiff
+                          :landfire-layers              landfire-layers-weather-test
+                          :max-runtime                  120
+                          :fetch-wind-speed-20ft-method :geotiff
+                          :wind-speed-20ft              (in-file-path "weather-test/ws_to_sample.tif")})
           results (run-simulation config)]
 
       (is (every? some? results)))))
@@ -243,11 +243,11 @@
 (deftest run-simulation-using-wind-direction-raster-test
   (testing "Running simulation using wind direction data from geotiff file"
     (let [config  (merge test-config-base
-                         {:fetch-layer-method       :geotiff
-                          :landfire-layers          landfire-layers-weather-test
-                          :max-runtime              120
-                          :fetch-temperature-method :geotiff
-                          :temperature              (in-file-path "weather-test/wd_to_sample.tif")})
+                         {:fetch-layer-method          :geotiff
+                          :landfire-layers             landfire-layers-weather-test
+                          :max-runtime                 120
+                          :fetch-wind-direction-method :geotiff
+                          :wind-direction              (in-file-path "weather-test/wd_to_sample.tif")})
           results (run-simulation config)]
 
       (is (every? some? results)))))
@@ -314,7 +314,7 @@
   (testing "with global perturbation value"
     (let [config  (merge test-config-base
                          {:perturbations {:canopy-height {:spatial-type :global
-                                                          :range [-1.0 1.0]}}})
+                                                          :range        [-1.0 1.0]}}})
           results (run-simulation config)]
       (is (every? some? results))))
 
