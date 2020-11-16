@@ -7,7 +7,7 @@
                        (let [[min-val max-val] range]
                          (< min-val max-val))))
 
-(s/def ::range (s/coll-of int? :kind vector? :count 2))
+(s/def ::range (s/coll-of float? :kind vector? :count 2))
 
 (s/def ::pdf-info (s/and (s/keys :req-un [::spatial-type ::range])
                          ::valid-range))
