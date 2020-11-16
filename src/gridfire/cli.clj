@@ -157,8 +157,6 @@
     (/ (* eta (Math/sqrt (+ 1 (Math/pow (* x wsp) 2))))
        0.3002)))
 
-
-
 (defn run-simulations
   [{:keys
     [cell-size outfile-suffix output-geotiffs? output-pngs? output-csvs?
@@ -188,10 +186,10 @@
                                       :foliar-moisture           (* 0.01 (foliar-moisture i))
                                       :ellipse-adjustment-factor (ellipse-adjustment-factor i)
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
-                                      :num-cols                  (m/row-count (:fuel-model landfire-rasters))
+                                      :num-cols                  (m/column-count (:fuel-model landfire-rasters))
                                       :multiplier-lookup         multiplier-lookup
                                       :perturbations             (when perturbations
-                                                                  (perturbations i))}
+                                                                   (perturbations i))}
                                      initial-ignition-site)]
          (do
            (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
