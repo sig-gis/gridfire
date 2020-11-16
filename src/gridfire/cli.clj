@@ -7,6 +7,7 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.spec.alpha :as s]
+            [gridfire.crown-fire :refer [m->ft]]
             [gridfire.fetch :as fetch]
             [gridfire.fire-spread :refer [run-fire-spread]]
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
@@ -271,25 +272,26 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-(defn get-weather [config rand-generator weather-type]
-  (let [val          (config weather-type)
-        fetch-method (keyword (str/join "-" ["fetch" (name weather-type) "method"]))]
-    (if (contains? config fetch-method)
-      (fetch/weather config weather-type)
-      (draw-samples rand-generator (:simulations config) val))))
+(defn get-weather [config rand-generator weather-type weather-layers]
+  (if (contains? weather-layers weather-type)
+    (get-in weather-layers [weather-type :matrix])
+    (draw-samples rand-generator (:simulations config) (config weather-type))))
+
+(defn fetch-weather-layers [config]
+  (reduce (fn [acc layer]
+            (let [fetch-method (keyword (str/join "-" ["fetch" (name layer) "method"]))]
+              (if (contains? config fetch-method)
+                (assoc acc layer (fetch/weather config layer))
+                acc)))
+          {}
+          spec/weather-names))
 
 (defn create-multiplier-lookup
-  [{:keys [cell-size] :as config}]
-  (let [weather-keys (->> spec/weather-names
-                          (select-keys config)
-                          (filter (fn [[k v]] (map? v)))
-                          keys)]
-    (reduce (fn [acc k]
-              (assoc acc k (int (quot
-                                 (get-in config [k :cell-size])
-                                 cell-size))))
-            {}
-            weather-keys)))
+  [{:keys [cell-size] :as config} weather-layers]
+  (reduce-kv (fn [acc k {:keys [scalex]}]
+               (assoc acc k (int (quot (m->ft scalex) cell-size))))
+             {}
+             weather-layers))
 
 (defn print-error [err config]
   (prn "CONFIG ERROR for:")
@@ -301,12 +303,13 @@
   (doseq [config-file config-files]
     (let [config (edn/read-string (slurp config-file))]
       (if (s/valid? ::spec/config config)
-        (let [multiplier-lookup (create-multiplier-lookup config)
-              landfire-layers   (fetch-landfire-layers config)
+        (let [landfire-layers   (fetch-landfire-layers config)
               landfire-rasters  (into {}
                                       (map (fn [[layer info]] [layer (:matrix info)]))
                                       landfire-layers)
               ignition-raster   (fetch/initial-ignition-layers config)
+              weather-layers    (fetch-weather-layers config)
+              multiplier-lookup (create-multiplier-lookup config weather-layers)
               envelope          (get-envelope config landfire-layers)
               simulations       (:simulations config)
               rand-generator    (if-let [seed (:random-seed config)]
@@ -323,10 +326,10 @@
                 (draw-samples rand-generator simulations (:ignition-row config))
                 (draw-samples rand-generator simulations (:ignition-col config))
                 (draw-samples rand-generator simulations (:max-runtime config))
-                (get-weather config rand-generator :temperature)
-                (get-weather config rand-generator :relative-humidity)
-                (get-weather config rand-generator :wind-speed-20ft)
-                (get-weather config rand-generator :wind-from-direction)
+                (get-weather config rand-generator :temperature weather-layers)
+                (get-weather config rand-generator :relative-humidity weather-layers)
+                (get-weather config rand-generator :wind-speed-20ft weather-layers)
+                (get-weather config rand-generator :wind-from-direction weather-layers)
                 (draw-samples rand-generator simulations (:foliar-moisture config))
                 (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
                 ignition-raster

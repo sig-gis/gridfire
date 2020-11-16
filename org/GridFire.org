@@ -2510,6 +2510,7 @@ or false:
             [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.spec.alpha :as s]
+            [gridfire.crown-fire :refer [m->ft]]
             [gridfire.fetch :as fetch]
             [gridfire.fire-spread :refer [run-fire-spread]]
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
@@ -2774,25 +2775,26 @@ or false:
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-(defn get-weather [config rand-generator weather-type]
-  (let [val          (config weather-type)
-        fetch-method (keyword (str/join "-" ["fetch" (name weather-type) "method"]))]
-    (if (contains? config fetch-method)
-      (fetch/weather config weather-type)
-      (draw-samples rand-generator (:simulations config) val))))
+(defn get-weather [config rand-generator weather-type weather-layers]
+  (if (contains? weather-layers weather-type)
+    (get-in weather-layers [weather-type :matrix])
+    (draw-samples rand-generator (:simulations config) (config weather-type))))
+
+(defn fetch-weather-layers [config]
+  (reduce (fn [acc layer]
+            (let [fetch-method (keyword (str/join "-" ["fetch" (name layer) "method"]))]
+              (if (contains? config fetch-method)
+                (assoc acc layer (fetch/weather config layer))
+                acc)))
+          {}
+          spec/weather-names))
 
 (defn create-multiplier-lookup
-  [{:keys [cell-size] :as config}]
-  (let [weather-keys (->> spec/weather-names
-                          (select-keys config)
-                          (filter (fn [[k v]] (map? v)))
-                          keys)]
-    (reduce (fn [acc k]
-              (assoc acc k (int (quot
-                                 (get-in config [k :cell-size])
-                                 cell-size))))
-            {}
-            weather-keys)))
+  [{:keys [cell-size] :as config} weather-layers]
+  (reduce-kv (fn [acc k {:keys [scalex]}]
+               (assoc acc k (int (quot (m->ft scalex) cell-size))))
+             {}
+             weather-layers))
 
 (defn print-error [err config]
   (prn "CONFIG ERROR for:")
@@ -2804,12 +2806,13 @@ or false:
   (doseq [config-file config-files]
     (let [config (edn/read-string (slurp config-file))]
       (if (s/valid? ::spec/config config)
-        (let [multiplier-lookup (create-multiplier-lookup config)
-              landfire-layers   (fetch-landfire-layers config)
+        (let [landfire-layers   (fetch-landfire-layers config)
               landfire-rasters  (into {}
                                       (map (fn [[layer info]] [layer (:matrix info)]))
                                       landfire-layers)
               ignition-raster   (fetch/initial-ignition-layers config)
+              weather-layers    (fetch-weather-layers config)
+              multiplier-lookup (create-multiplier-lookup config weather-layers)
               envelope          (get-envelope config landfire-layers)
               simulations       (:simulations config)
               rand-generator    (if-let [seed (:random-seed config)]
@@ -2826,10 +2829,10 @@ or false:
                 (draw-samples rand-generator simulations (:ignition-row config))
                 (draw-samples rand-generator simulations (:ignition-col config))
                 (draw-samples rand-generator simulations (:max-runtime config))
-                (get-weather config rand-generator :temperature)
-                (get-weather config rand-generator :relative-humidity)
-                (get-weather config rand-generator :wind-speed-20ft)
-                (get-weather config rand-generator :wind-from-direction)
+                (get-weather config rand-generator :temperature weather-layers)
+                (get-weather config rand-generator :relative-humidity weather-layers)
+                (get-weather config rand-generator :wind-speed-20ft weather-layers)
+                (get-weather config rand-generator :wind-from-direction weather-layers)
                 (draw-samples rand-generator simulations (:foliar-moisture config))
                 (draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
                 ignition-raster
@@ -3023,42 +3026,42 @@ this functionality.
 (defmethod weather :postgis-temperature
   [{:keys [temperature db-spec] :as config} type]
   (let [sql (if (map? temperature) (:sql temperature) temperature)]
-    (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
+    (postgis-raster-to-matrix-multiband db-spec sql)))
 
 (defmethod weather :geotiff-temperature
   [{:keys [temperature] :as config} type]
   (let [path (if (map? temperature) (:path temperature) temperature)]
-   (:matrix (geotiff-raster-to-matrix-multiband path))))
+    (geotiff-raster-to-matrix-multiband path)))
 
 (defmethod weather :postgis-relative-humidity
   [{:keys [relative-humidity db-spec] :as config} type]
   (let [sql (if (map? relative-humidity) (:sql relative-humidity) relative-humidity)]
-   (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
+    (postgis-raster-to-matrix-multiband db-spec sql)))
 
 (defmethod weather :geotiff-relative-humidity
   [{:keys [relative-humidity] :as config} type]
   (let [path (if (map? relative-humidity) (:path relative-humidity) relative-humidity)]
-   (:matrix (geotiff-raster-to-matrix-multiband path))))
+    (geotiff-raster-to-matrix-multiband path)))
 
 (defmethod weather :postgis-wind-speed-20ft
   [{:keys [wind-speed-20ft db-spec] :as config} type]
   (let [sql (if (map? wind-speed-20ft) (:sql wind-speed-20ft) wind-speed-20ft)]
-   (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
+    (postgis-raster-to-matrix-multiband db-spec sql)))
 
 (defmethod weather :geotiff-wind-speed-20ft
   [{:keys [wind-speed-20ft] :as config} type]
   (let [path (if (map? wind-speed-20ft) (:path wind-speed-20ft) wind-speed-20ft)]
-      (:matrix (geotiff-raster-to-matrix-multiband path))))
+    (geotiff-raster-to-matrix-multiband path)))
 
 (defmethod weather :postgis-wind-from-direction
   [{:keys [wind-from-direction db-spec] :as config} type]
   (let [sql (if (map? wind-from-direction) (:sql wind-from-direction) wind-from-direction)]
-      (:matrix (postgis-raster-to-matrix-multiband db-spec sql))))
+    (postgis-raster-to-matrix-multiband db-spec sql)))
 
 (defmethod weather :geotiff-wind-from-direction
   [{:keys [wind-from-direction] :as config} type]
   (let [path (if (map? wind-from-direction) (:path wind-from-direction) wind-from-direction)]
-    (:matrix (geotiff-raster-to-matrix-multiband path))))
+    (geotiff-raster-to-matrix-multiband path)))
 #+end_src
 ** Section 3: Weather data from which to build simulation inputs
 
@@ -3084,39 +3087,25 @@ PostGIS database or a raster file on disk.
 To use weather raster in our PostGIS database include the
 following mappings:
 - *fetch-<weather-type>-method*: a keyword to denote which method we want to use
-- *<weather-type>*: a map of location and additional options
+- *<weather-type>*: partial sql string
 
 #+begin_src clojure
 {:fetch-temperature-method :postgis
- :temperature              {:sql "weather.tmpf WHERE rid=1"}}
+ :temperature              "weather.tmpf WHERE rid=1"}
 #+end_src
 
 To use weather raster from a raster file on disk include the
 following mappings:
 - *fetch-<weather-type>-method*: a keyword to denote which method we want to use
-- *<weather-type>*: a map of location and additional options
+- *<weather-type>*: filepath to the geotiff file
 
 #+begin_src clojure
 {:fetch-temperature-method :geotiff
- :temperature              {:path "test/gridfire/resources/weather-test/tmpf_to_sample.tif"}}
+ :temperature              "test/gridfire/resources/weather-test/tmpf_to_sample.tif"}
 #+end_src
 
-Gridfire expects weather rasters to have the same resolution as designated by the
-`:cell-size` configuration value. However to improve performance Gridfire
-optionally supports the use of weather rasters with a lower resolution.
-
-To use weather raster with lower resolution than the simulation `:cell-size` include
-the following key value pair in the location map:
-- *cell-size*: integer (units feet)
-
-*Note:* cell-size of all weather rasters and the simulation's cell-size must be
-multiples of one another.
-
-#+begin_src clojure
-{:fetch-temperature-method :geotiff
- :temperature              {:path      "test/gridfire/resources/weather-test/tmpf_to_sample.tif"
-                            :cell-size 98.425}}
-#+end_src
+*NOTE:* Gridfire expects weather raster's resolution and the landfire's resolution
+as designated by the `:cell-size` must be exact multiples of one another.
 
 ** Section 4: Number of simulations and (optional) random seed perimeter
 
