@@ -1918,26 +1918,22 @@ pseudo-code lays out the steps taken in this procedure:
            :otherwise (+ 21.0606 (* 0.005565 rh rh) (* -0.00035 rh temp) (* -0.483199 rh)))
      30))
 
-(defn sample-weather-at
-  [here global-clock raster multiplier perturb-info]
-  (let [[i j]      (if multiplier
+(defn matrix-value-at [[i j] global-clock matrix]
+  (if (> (m/dimensionality matrix) 2)
+    (let [band (int (quot global-clock 60.0))] ;Assuming each band is 1 hour
+      (m/mget matrix band i j))
+    (m/mget matrix i j)))
+
+(defn sample-at
+  [here global-clock matrix multiplier perturb-info]
+  (let [cell       (if multiplier
                      (map #(quot % multiplier) here)
                      here)
-        band       (int (quot global-clock 60.0))
-        value-here (m/mget raster band i j)] ;; Assuming each band is 1 hour
+        value-here (matrix-value-at cell global-clock matrix)]
     (if perturb-info
       (if-let [freq (:frequency perturb-info)]
-        (+ value-here (perturbation/value-at perturb-info raster here (quot global-clock freq)))
-        (+ value-here (perturbation/value-at perturb-info raster here)))
-      value-here)))
-
-(defn sample-landfire-at
-  [[i j :as here] global-clock matrix perturb-info]
-  (let [value-here (m/mget matrix i j)]
-    (if perturb-info
-      (if-let [freq (:frequency perturb-info)]
-        (+ value-here (perturbation/value-at perturb-info matrix here (quot global-clock freq)))
-        (+ value-here (perturbation/value-at perturb-info matrix here)))
+        (+ value-here (perturbation/value-at perturb-info matrix cell (quot global-clock freq)))
+        (+ value-here (perturbation/value-at perturb-info matrix cell)))
       value-here)))
 
 (defn fuel-moisture [relative-humidity temperature]
@@ -1954,43 +1950,22 @@ pseudo-code lays out the steps taken in this procedure:
            multiplier-lookup perturbations]}
    global-clock
    [i j :as here]]
-  (let [{:keys [slope aspect canopy-height canopy-base-height crown-bulk-density
-                canopy-cover fuel-model]} landfire-layers]
-    {:wind-speed-20ft     (if (v/vectorz? wind-speed-20ft)
-                            (sample-weather-at here
-                                               global-clock
-                                               wind-speed-20ft
-                                               (:wind-speed-20ft multiplier-lookup)
-                                               (:wind-speed-20ft perturbations))
-                            wind-speed-20ft)
-     :wind-from-direction (if (v/vectorz? wind-from-direction)
-                            (sample-weather-at here
-                                               global-clock
-                                               wind-from-direction
-                                               (:wind-from-direction multiplier-lookup)
-                                               (:wind-from-direction perturbations))
-                            wind-from-direction)
-     :temperature         (if (v/vectorz? temperature)
-                            (sample-weather-at here
-                                               global-clock
-                                               temperature
-                                               (:temperature multiplier-lookup)
-                                               (:temperature perturbations))
-                            temperature)
-     :relative-humidity   (if (v/vectorz? relative-humidity)
-                            (sample-weather-at here
-                                               global-clock
-                                               relative-humidity
-                                               (:relative-humidity multiplier-lookup)
-                                               (:relative-humidity perturbations))
-                            relative-humidity)
-     :fuel-model-number   (sample-landfire-at here global-clock fuel-model (:fuel-model perturbations))
-     :slope               (m/mget slope i j)
-     :aspect              (m/mget aspect i j)
-     :canopy-height       (sample-landfire-at here global-clock canopy-height (:canopy-height perturbations))
-     :canopy-base-height  (sample-landfire-at here global-clock canopy-base-height (:canopy-base-height perturbations))
-     :crown-bulk-density  (sample-landfire-at here global-clock crown-bulk-density (:crown-bulk-density perturbations))
-     :canopy-cover        (sample-landfire-at here global-clock canopy-cover (:canopy-cover perturbations))}))
+  (let [layers (merge landfire-layers
+                      {:wind-speed-20ft     wind-speed-20ft
+                       :wind-from-direction wind-from-direction
+                       :temperature         temperature
+                       :relative-humidity   relative-humidity})]
+    (reduce-kv
+     (fn[acc name val]
+       (if (> (m/dimensionality val) 1)
+         (assoc acc name (sample-at here
+                                    global-clock
+                                    val
+                                    (name multiplier-lookup)
+                                    (name perturbations)))
+         (assoc acc name val)))
+     {}
+     layers)))
 
 (defn compute-neighborhood-fire-spread-rates!
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
@@ -2008,14 +1983,14 @@ pseudo-code lays out the steps taken in this procedure:
           canopy-cover
           canopy-height
           crown-bulk-density
-          fuel-model-number
+          fuel-model
           relative-humidity
           slope
           temperature
           wind-from-direction
           wind-speed-20ft]}          (extract-constants constants global-clock here)
         fuel-moisture                (fuel-moisture relative-humidity temperature)
-        [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model-number fuel-moisture)
+        [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model fuel-moisture)
         midflame-wind-speed          (* wind-speed-20ft 88.0
                                         (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
         spread-info-max              (rothermel-surface-fire-spread-max spread-info-min
