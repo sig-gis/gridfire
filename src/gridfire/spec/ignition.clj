@@ -9,4 +9,7 @@
   (s/keys :req-un [::unburned ::burned]))
 
 (s/def ::ignition-layer
-  (s/keys :req-un [(or ::common/sql ::common/path) ::burn-values]))
+  (s/or
+   ::common/path
+   ::common/sql
+   (s/keys :req-un [(or ::common/sql ::common/path) ::burn-values])))
