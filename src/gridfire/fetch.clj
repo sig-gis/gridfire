@@ -12,11 +12,13 @@
 
 (defmethod initial-ignition-layers :postgis
   [{:keys [db-spec ignition-layer] :as config}]
-  (postgis-raster-to-matrix db-spec ignition-layer))
+  (merge (postgis-raster-to-matrix db-spec ignition-layer)
+         (:burn-values ignition-layer)))
 
 (defmethod initial-ignition-layers :geotiff
   [{:keys [ignition-layer] :as config}]
-  (geotiff-raster-to-matrix ignition-layer))
+  (merge (geotiff-raster-to-matrix (:path ignition-layer))
+         (:burn-values ignition-layer)))
 
 (defmethod initial-ignition-layers :default
   [config]
