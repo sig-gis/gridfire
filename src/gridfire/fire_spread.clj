@@ -343,7 +343,7 @@
        :fire-spread-matrix         fire-spread-matrix
        :flame-length-matrix        flame-length-matrix
        :fire-line-intensity-matrix fire-line-intensity-matrix
-       :burn-time-matrix          burn-time-matrix})))
+       :burn-time-matrix           burn-time-matrix})))
 
 (defmulti run-fire-spread
   "Runs the raster-based fire spread model with a map of these arguments:
