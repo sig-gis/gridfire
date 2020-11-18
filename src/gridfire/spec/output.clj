@@ -9,9 +9,7 @@
 
 (s/def ::type
   (s/or :key #{:final}
-        :scalar int?
-        :vector (s/coll-of int? :kind vector? :count 2)
-        :list (s/coll-of int? :kind list?)))
+        :scalar int?))
 
 (s/def ::fire-spread ::type)
 (s/def ::flame-length ::type)
