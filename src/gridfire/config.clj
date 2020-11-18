@@ -86,7 +86,7 @@
 (defn process-weather
   [{:strs [STOCHASTIC_TMP_FILENAME STOCHASTIC_RH_FILENAME STOCHASTIC_WS_FILENAME
            STOCHASTIC_WD_FILENAME FOLIAR_MOISTURE_CONTENT WEATHER_DIRECTORY]}
-   {:keys [weather-cell-size] :as options}
+   _
    config]
   (let [dir           WEATHER_DIRECTORY
         to-fetch-kw   (fn [k] (keyword (str/join "-" ["fetch" (name k) "method"])))
@@ -196,8 +196,7 @@
 
 (def cli-options
   [["-c" "--config-file FILE" "Path to an data file containing a map of simulation configs"]
-   ["-v" "--verbose" "Flag for controlling outputs"]
-   ["-w" "--weather-cell-size VALUE" "Flag for specifing weather cell size resolution in meters"]])
+   ["-v" "--verbose" "Flag for controlling outputs"]])
 
 (defn -main
   [& args]
