@@ -7,16 +7,16 @@
     `(s/and (s/keys :opt-un ~ks)
             #(some ~keyset (keys %)))))
 
-(s/def ::output
+(s/def ::type
   (s/or :key #{:final}
         :scalar int?
         :vector (s/coll-of int? :kind vector? :count 2)
         :list (s/coll-of int? :kind list?)))
 
-(s/def ::fire-spread ::output)
-(s/def ::flame-length ::output)
-(s/def ::fire-line-intensity ::output)
-(s/def ::burn-time ::output)
+(s/def ::fire-spread ::type)
+(s/def ::flame-length ::type)
+(s/def ::fire-line-intensity ::type)
+(s/def ::burn-time ::type)
 
 (s/def ::output-layers
   (common/one-or-more-keys
@@ -24,6 +24,3 @@
     ::flame-length
     ::fire-line-intensity
     ::burn-time]))
-
-(s/valid? ::output-layers {:fire-spread :final})
-(s/valid? ::output-layers {:fire-spread 0})
