@@ -10,6 +10,6 @@
 
 (s/def ::ignition-layer
   (s/or
-   ::common/path
-   ::common/sql
-   (s/keys :req-un [(or ::common/sql ::common/path) ::burn-values])))
+   :path ::common/path
+   :sql ::common/sql
+   :map (s/keys :req-un [(or ::common/sql ::common/path) ::burn-values])))
