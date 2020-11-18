@@ -184,10 +184,20 @@
       (is (every? some? results)))))
 
 (deftest postgis-ignition-test
-  (testing "Running simulation with ignition layers read from geotiff files"
+  (testing "Running simulation with ignition layers read from postgis files"
     (let [postgis-config (merge test-config-base
                                 {:fetch-ignition-method :postgis
                                  :ignition-layer        "ignition.ign WHERE rid=1"})
+          results        (run-simulation postgis-config)]
+      (is (every? some? results)))))
+
+(deftest burn-value-test
+  (testing "Running simulation with burned and unburned values different from Gridfire's definition"
+    (let [postgis-config (merge test-config-base
+                                {:fetch-ignition-method :geotiff
+                                 :ignition-layer        {:path        (in-file-path "ign.tif")
+                                                         :burn-values {:burned   -1.0
+                                                                       :unburned 1.0}}})
           results        (run-simulation postgis-config)]
       (is (every? some? results)))))
 
