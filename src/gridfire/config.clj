@@ -91,7 +91,7 @@
        (process-output data options)))
 
 (defn write-config [config-params]
-  (let [file "gridfire-config.edn"]
+  (let [file "gridfire.edn"]
     (println "Config file:" file)
     (spit file (with-out-str (pprint/pprint config-params)))))
 
