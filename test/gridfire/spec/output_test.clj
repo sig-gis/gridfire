@@ -24,8 +24,8 @@
     (is (s/valid? ::output/output-layers config))))
 
 (deftest multiple-output-layer-test
-  (let [config {:fire-spread          10
-                :flame-lenth          10
-                ::fire-line-intensity 10
-                :burn-time            10}]
+  (let [config {:fire-spread         10
+                :flame-lenth         10
+                :fire-line-intensity 10
+                :burn-time           10}]
     (is (s/valid? ::output/output-layers config))))
