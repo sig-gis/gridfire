@@ -359,7 +359,7 @@
   (let [fire-spread-matrix         (:matrix initial-ignition-raster)
         non-zero-indices           (get-non-zero-indices fire-spread-matrix)
         flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices)
-        fire-line-intensity-matrix (initialize-matrix num-cols num-cols non-zero-indices)
+        fire-line-intensity-matrix (initialize-matrix num-rows num-cols non-zero-indices)
         ignited-cells              (into {}
                                          (for [index non-zero-indices
                                                :let  [ignition-trajectories
