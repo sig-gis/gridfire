@@ -14,11 +14,11 @@
 (s/def ::fire-spread ::type)
 (s/def ::flame-length ::type)
 (s/def ::fire-line-intensity ::type)
-(s/def ::burn-time ::type)
+(s/def ::burn-history ::type)
 
 (s/def ::output-layers
   (common/one-or-more-keys
    [::fire-spread
     ::flame-length
     ::fire-line-intensity
-    ::burn-time]))
+    ::burn-history]))

@@ -5,17 +5,17 @@
             [clojure.data.csv :as csv]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.string :as str]
             [clojure.spec.alpha :as s]
+            [clojure.string :as str]
             [gridfire.crown-fire :refer [m->ft]]
             [gridfire.fetch :as fetch]
-            [gridfire.fire-spread :refer [run-fire-spread]]
+            [gridfire.fire-spread :refer [get-neighbors in-bounds? run-fire-spread]]
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix]]
-            [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
-            [gridfire.surface-fire :refer [degrees-to-radians]]
-            [gridfire.spec.config :as spec]
-            [gridfire.utils.random :refer [my-rand-int my-rand-nth random-float]]
             [gridfire.perturbation :as perturbation]
+            [gridfire.postgis-bridge :refer [postgis-raster-to-matrix]]
+            [gridfire.spec.config :as spec]
+            [gridfire.surface-fire :refer [degrees-to-radians]]
+            [gridfire.utils.random :refer [my-rand-int my-rand-nth]]
             [magellan.core :refer [make-envelope
                                    matrix-to-raster
                                    register-new-crs-definitions-from-properties-file!
@@ -160,10 +160,47 @@
 (defn kebab->snake [s]
   (str/replace s #"-" "_"))
 
-(defn layer-matrix [fire-spread-results layer]
-  (let [kw (->> (str (name layer) "-matrix")
-                keyword)]
-   (get fire-spread-results kw)))
+(defn min->hour [t]
+  (int (quot t 60)))
+
+(defn previous-active-perimeter?
+  [[i j :as here] matrix]
+  (let [num-rows (m/row-count matrix)
+        num-cols (m/column-count matrix)]
+   (and
+    (= (m/mget matrix i j) -1.0)
+    (->> (get-neighbors here)
+         (filter #(in-bounds? num-rows num-cols %))
+         (map #(apply m/mget matrix %))
+         (some pos?)))))
+
+(defn to-color-map-values [burn-time-matrix global-clock]
+  (m/emap-indexed (fn [here burn-time]
+                    (let [delta-hours (->> (- global-clock burn-time)
+                                           min->hour)]
+                      (cond
+                        (previous-active-perimeter? here burn-time-matrix) 201
+                        (= burn-time -1.0)                                 200
+                        (< 0 delta-hours 5)                                delta-hours
+                        (>= delta-hours 5)                                 5
+                        :else                                              0)))
+                  burn-time-matrix))
+
+(defn layer-matrix
+  [{:keys [global-clock burn-time-matrix] :as fire-spread-results} layer]
+  (if (= layer :burn-history)
+    (to-color-map-values burn-time-matrix global-clock)
+    (let [kw (->> (str (name layer) "-matrix")
+                  keyword)]
+      (get fire-spread-results kw))))
+
+(defn layer-snapshot [burn-time-matrix layer-matrix  t]
+  (m/emap (fn [layer-value burn-time]
+            (if (<= burn-time t)
+              layer-value
+              0))
+          layer-matrix
+          burn-time-matrix))
 
 (defn process-output-layers-timestep!
   [{:keys [output-layers output-geotiffs? output-pngs? output-dir]}
@@ -172,12 +209,9 @@
    simulation-id]
   (doseq [[layer timestep] output-layers
           output-time      (range 0 (inc global-clock) timestep)]
-    (let [filtered-matrix (m/emap (fn [layer-value burn-time]
-                                    (if (<= burn-time output-time)
-                                      layer-value
-                                      0.0))
-                                  (layer-matrix fire-spread-results layer)
-                                  burn-time-matrix)
+    (let [filtered-matrix (layer-snapshot burn-time-matrix
+                                          (layer-matrix fire-spread-results layer)
+                                          output-time)
           layer-name      (-> (name layer)
                               kebab->snake)]
       (do
