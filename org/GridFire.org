@@ -3007,7 +3007,7 @@ this functionality.
 
 (defmethod initial-ignition-layers :geotiff
   [{:keys [ignition-layer] :as config}]
-  (geotiff-raster-to-matrix ignition-layer))
+  (geotiff-raster-to-matrix (:path ignition-layer)))
 
 (defmethod initial-ignition-layers :default
   [config]
