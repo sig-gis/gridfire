@@ -2995,7 +2995,15 @@ this functionality.
             [gridfire.magellan-bridge :refer [geotiff-raster-to-matrix
                                               geotiff-raster-to-matrix-multiband]]
             [gridfire.postgis-bridge :refer [postgis-raster-to-matrix
-                                             postgis-raster-to-matrix-multiband]]))
+                                             postgis-raster-to-matrix-multiband]]
+            [clojure.core.matrix :as m]))
+
+(defn convert-burn-values [matrix {:keys [burned unburned]}]
+  (m/emap #(condp = %
+             (double burned)   1.0
+             (double unburned) 0.0
+             -1.0)
+          matrix))
 
 (defmulti initial-ignition-layers
   (fn [config]
@@ -3003,11 +3011,19 @@ this functionality.
 
 (defmethod initial-ignition-layers :postgis
   [{:keys [db-spec ignition-layer] :as config}]
-  (postgis-raster-to-matrix db-spec ignition-layer))
+  (let [sql    (or (:sql ignition-layer) ignition-layer)
+        raster (postgis-raster-to-matrix db-spec sql)]
+    (if-let [bv (:burn-values ignition-layer)]
+      (assoc raster :matrix (convert-burn-values (:matrix raster) bv))
+      raster)))
 
 (defmethod initial-ignition-layers :geotiff
   [{:keys [ignition-layer] :as config}]
-  (geotiff-raster-to-matrix (:path ignition-layer)))
+  (let [path   (or (:path ignition-layer) ignition-layer)
+        raster (geotiff-raster-to-matrix path)]
+    (if-let [bv (:burn-values ignition-layer)]
+      (assoc raster :matrix (convert-burn-values (:matrix raster) bv))
+      raster)))
 
 (defmethod initial-ignition-layers :default
   [config]
