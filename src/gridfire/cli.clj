@@ -174,9 +174,9 @@
          (map #(apply m/mget matrix %))
          (some pos?)))))
 
-(defn to-color-map-values [burn-time-matrix global-clock]
+(defn to-color-map-values [burn-time-matrix current-clock]
   (m/emap-indexed (fn [here burn-time]
-                    (let [delta-hours (->> (- global-clock burn-time)
+                    (let [delta-hours (->> (- current-clock burn-time)
                                            min->hour)]
                       (cond
                         (previous-active-perimeter? here burn-time-matrix) 201
@@ -187,9 +187,9 @@
                   burn-time-matrix))
 
 (defn layer-matrix
-  [{:keys [global-clock burn-time-matrix] :as fire-spread-results} layer]
+  [{:keys [burn-time-matrix] :as fire-spread-results} layer current-clock]
   (if (= layer :burn-history)
-    (to-color-map-values burn-time-matrix global-clock)
+    (to-color-map-values burn-time-matrix current-clock)
     (let [kw (->> (str (name layer) "-matrix")
                   keyword)]
       (get fire-spread-results kw))))
@@ -210,7 +210,7 @@
   (doseq [[layer timestep] output-layers
           output-time      (range 0 (inc global-clock) timestep)]
     (let [filtered-matrix (layer-snapshot burn-time-matrix
-                                          (layer-matrix fire-spread-results layer)
+                                          (layer-matrix fire-spread-results layer output-time)
                                           output-time)
           layer-name      (-> (name layer)
                               kebab->snake)]
