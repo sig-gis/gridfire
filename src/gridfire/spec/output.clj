@@ -15,10 +15,12 @@
 (s/def ::flame-length ::type)
 (s/def ::fire-line-intensity ::type)
 (s/def ::burn-history ::type)
+(s/def ::burn-probability ::type)
 
-(s/def ::output-layers
+(s/def ::simulation-layers
   (common/one-or-more-keys
    [::fire-spread
     ::flame-length
     ::fire-line-intensity
     ::burn-history]))
+

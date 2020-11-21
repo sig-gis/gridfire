@@ -97,7 +97,8 @@
              ::landfire-layers]
     :opt-un [::perturbations/perturbations
              ::ignition/ignition-layer
-             ::output/output-layers])
+             ::output/simulation-layers
+             ::output/burn-probability])
    ::weather-layers
    #(valid-weather-cell-sizes? %)
    #(valid-weather-fetch-methods? %)))
