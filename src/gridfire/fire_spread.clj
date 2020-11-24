@@ -427,7 +427,7 @@
 
 (defmethod run-fire-spread clojure.lang.PersistentHashMap
   [{:keys [landfire-layers num-rows num-cols] :as constants} initial-ignition-raster]
-  (let [fire-spread-matrix         (:matrix initial-ignition-raster)
+  (let [fire-spread-matrix         (m/mutable (:matrix initial-ignition-raster))
         non-zero-indices           (get-non-zero-indices fire-spread-matrix)
         flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices)
         fire-line-intensity-matrix (initialize-matrix num-rows num-cols non-zero-indices)

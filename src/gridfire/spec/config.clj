@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [gridfire.spec.common :as common]
             [gridfire.spec.ignition :as ignition]
+            [gridfire.spec.output :as output]
             [gridfire.spec.perturbations :as perturbations]))
 
 ;;-----------------------------------------------------------------------------
@@ -97,8 +98,8 @@
              ::landfire-layers]
     :opt-un [::perturbations/perturbations
              ::ignition/ignition-layer
-             ::output/simulation-layers
-             ::output/burn-probability])
+             ::output/output-layers
+             ::output/output-burn-probability])
    ::weather-layers
    #(valid-weather-cell-sizes? %)
    #(valid-weather-fetch-methods? %)))
