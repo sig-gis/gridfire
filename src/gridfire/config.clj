@@ -87,7 +87,7 @@
 
 (defn process-weather
   [{:strs [STOCHASTIC_TMP_FILENAME STOCHASTIC_RH_FILENAME STOCHASTIC_WS_FILENAME
-           STOCHASTIC_WD_FILENAME FOLIAR_MOISTURE_CONTENT WEATHER_DIRECTORY]}
+           STOCHASTIC_WD_FILENAME WEATHER_DIRECTORY]}
    _
    config]
   (let [dir           WEATHER_DIRECTORY
@@ -95,8 +95,7 @@
         layers        {:temperature         (file-path dir STOCHASTIC_TMP_FILENAME)
                        :relative-humidity   (file-path dir STOCHASTIC_RH_FILENAME)
                        :wind-speed-20ft     (file-path dir STOCHASTIC_WS_FILENAME)
-                       :wind-from-direction (file-path dir STOCHASTIC_WD_FILENAME)
-                       :foliar-moisture     FOLIAR_MOISTURE_CONTENT}
+                       :wind-from-direction (file-path dir STOCHASTIC_WD_FILENAME)}
         fetch-methods (reduce-kv (fn[acc k v]
                                    (assoc acc (to-fetch-kw k) :geotiff))
                                  {}
@@ -111,13 +110,17 @@
 ;;-----------------------------------------------------------------------------
 
 (defn process-output
-  [data {:keys [verbose]} config]
-  (merge config
-         {:outfile-suffix          ""
-          :output-landfire-inputs? false
-          :output-geotiffs?        true
-          :output-pngs?            (if verbose true false)
-          :output-csvs?            (if verbose true false)}))
+  [{:keys [CALCULATE_BURN_PROBABILITY DTDUMP DUMP_BURN_PROBABILITY_AT_DTDUMP]}
+   {:keys [verbose]} config]
+  (let [burn-probability (when DUMP_BURN_PROBABILITY_AT_DTDUMP
+                           {:burn-probability (sec->min DTDUMP)})]
+    (merge config
+           burn-probability
+           {:outfile-suffix          ""
+            :output-landfire-inputs? false
+            :output-geotiffs?        true
+            :output-pngs?            (if verbose true false)
+            :output-csvs?            (if verbose true false)})))
 
 ;;-----------------------------------------------------------------------------
 ;; Perturbations
@@ -170,14 +173,14 @@
 (defn build-edn
   [{:strs
     [COMPUTATIONAL_DOMAIN_CELLSIZE SIMULATION_TSTOP NUM_ENSEMBLE_MEMBERS
-     A_SRS
-     SEED] :as data}
+     A_SRS FOLIAR_MOISTURE_CONTENT SEED] :as data}
    options]
   (->> {:cell-size                 (m->ft COMPUTATIONAL_DOMAIN_CELLSIZE)
         :srid                      A_SRS
         :max-runtime               (sec->min SIMULATION_TSTOP)
         :simulations               NUM_ENSEMBLE_MEMBERS
         :random-seed               SEED
+        :foliar-moisture     FOLIAR_MOISTURE_CONTENT
         :ellipse-adjustment-factor 1.0}
        (process-landfire-layers data options)
        (process-ignition data options)
