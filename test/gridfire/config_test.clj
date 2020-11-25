@@ -2,6 +2,7 @@
   (:require [gridfire.config :as config]
             [gridfire.crown-fire :refer [m->ft]]
             [gridfire.spec.perturbations :as spec-p]
+            [gridfire.spec.config :as spec]
             [clojure.spec.alpha :as s]
             [clojure.test :refer [deftest is testing]]))
 
@@ -57,6 +58,8 @@
                                       config/parse)
                                  nil)]
 
+    (is (s/valid? ::spec/config config))
+
     (is (= config {:fetch-layer-method               :geotiff
                    :landfire-layers                  {:aspect             "/fuels_and_topography/asp.tif"
                                                       :canopy-base-height "/fuels_and_topography/cbh.tif"
@@ -101,4 +104,4 @@
                    :fetch-relative-humidity-method   :geotiff
                    :fetch-wind-speed-20ft-method     :geotiff
                    :fetch-wind-from-direction-method :geotiff
-                   }))))
+                   :burn-probability                 60}))))
