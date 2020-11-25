@@ -202,47 +202,67 @@
           layer-matrix
           burn-time-matrix))
 
-(defn output-simulation-layers-timestep!
-  [{:keys [output-layers output-geotiffs? output-pngs? output-dir]}
+(defn output-filename [name outfile-suffix simulation-id output-time ext]
+  (str (str/join "_"
+             (remove nil? [name
+                           outfile-suffix
+                           simulation-id
+                           (when output-time
+                             (str "t" output-time))]))
+       ext))
+
+(defn output-geotiff
+  ([config matrix name envelope simulation-id]
+   (output-geotiff config matrix name envelope simulation-id nil))
+
+  ([{:keys [output-geotiffs? outfile-suffix] :as config}
+    matrix name envelope simulation-id output-time]
+   (when output-geotiffs?
+     (-> (matrix-to-raster name matrix envelope)
+         (write-raster (output-filename name
+                                        outfile-suffix
+                                        simulation-id
+                                        output-time
+                                        ".tif"))))))
+
+(defn output-png
+  ([config matrix name envelope simulation-id]
+   (output-png config matrix name envelope simulation-id nil))
+
+  ([{:keys [output-png? outfile-suffix] :as config}
+    matrix name envelope simulation-id output-time]
+   (when output-png?
+     (save-matrix-as-png :color 4 -1.0
+                         matrix
+                         (output-filename name
+                                          outfile-suffix
+                                          simulation-id
+                                          output-time
+                                          ".png")))))
+
+(defn output-simulation-layers!
+  [{:keys [output-layers]:as config}
    {:keys [global-clock burn-time-matrix] :as fire-spread-results}
    envelope
    simulation-id]
-  (doseq [[layer timestep] output-layers
-          output-time      (range 0 (inc global-clock) timestep)]
-    (let [filtered-matrix (layer-snapshot burn-time-matrix
-                                          (layer-matrix fire-spread-results layer output-time)
-                                          output-time)
-          layer-name      (-> (name layer)
-                              kebab->snake)]
-      (do
-        (when output-geotiffs?
-          (-> (matrix-to-raster layer-name filtered-matrix envelope)
-              (write-raster (str/join "_" [layer-name
-                                           simulation-id
-                                           (str "t" output-time ".tif")]))))
-        (when output-pngs?
-          (save-matrix-as-png :color 4 -1.0
-                              filtered-matrix
-                              (str/join "_" [layer-name
-                                             simulation-id
-                                             (str "t" output-time ".png")])))))))
+  (doseq [[layer timestep] output-layers]
+    (if (int? timestep)
+      (doseq [output-time (range 0 (inc global-clock) timestep)]
+       (let [filtered-matrix (layer-snapshot burn-time-matrix
+                                             (layer-matrix fire-spread-results layer output-time)
+                                             output-time)
+             layer-name      (kebab->snake (name layer))]
+         (output-geotiff config filtered-matrix layer-name envelope simulation-id output-time)
+         (output-png config filtered-matrix layer-name envelope simulation-id output-time))))))
 
-(defn output-simulation-layers!
-  [{:keys [output-geotiffs? outfile-suffix output-pngs?] :as config}
-   fire-spread-results
-   envelope
-   simulation-id]
+(defn output-simulation-layers-all!
+  [config fire-spread-results envelope simulation-id]
   (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
                         ["flame_length"        :flame-length-matrix]
                         ["fire_line_intensity" :fire-line-intensity-matrix]]]
-    (do
-      (when output-geotiffs?
-        (-> (matrix-to-raster name (fire-spread-results layer) envelope)
-            (write-raster (str name outfile-suffix "_" simulation-id ".tif"))))
-      (when output-pngs?
-        (save-matrix-as-png :color 4 -1.0
-                            (fire-spread-results layer)
-                            (str name outfile-suffix "_" simulation-id ".png"))))))
+    (let [matrix (fire-spread-results layer)]
+      (output-geotiff config matrix name envelope simulation-id)
+      (output-png config matrix name envelope simulation-id))))
 
 (defn process-burn-count!
   [{:keys [fire-spread-matrix burn-time-matrix global-clock]}
@@ -259,20 +279,14 @@
       (m/add! (nth (seq burn-count-matrix) band) filtered-fire-spread))))
 
 (defn output-burn-probability-layer!
-  [{:keys [output-geotiffs? output-pngs? output-burn-probability simulations]} envelope burn-count-matrix]
+  [{:keys [output-burn-probability simulations] :as config} envelope burn-count-matrix]
   (when-let [timestep output-burn-probability]
     (doseq [[band matrix] (map-indexed vector burn-count-matrix)]
       (let [output-name        "burn_probability"
             output-time        (* band timestep)
             probability-matrix (m/emap #(/ % simulations) matrix)]
-        (do
-          (when output-geotiffs?
-           (-> (matrix-to-raster output-name probability-matrix envelope)
-               (write-raster (str/join "_" [output-name (str "t" output-time ".tif")]))))
-          (when output-pngs?
-            (save-matrix-as-png :color 4 -1.0
-                                probability-matrix
-                                (str/join "_" [output-name (str "t" output-time ".png")]))))))))
+        (output-geotiff config probability-matrix output-name envelope nil output-time)
+        (output-png config probability-matrix output-name envelope nil output-time)))))
 
 (defn initialize-burn-count-matrix
   [{:keys [output-burn-probability]} max-runtime num-rows num-cols]
@@ -315,8 +329,8 @@
                                      initial-ignition-site)]
          (do
            (if output-layers
-             (output-simulation-layers-timestep! config fire-spread-results envelope i)
-             (output-simulation-layers! config fire-spread-results envelope i))
+             (output-simulation-layers! config fire-spread-results envelope i)
+             (output-simulation-layers-all! config fire-spread-results envelope i))
            (when-let [timestep output-burn-probability]
              (process-burn-count! fire-spread-results burn-count-matrix timestep))
            (if output-csvs?
