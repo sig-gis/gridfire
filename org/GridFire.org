@@ -2670,6 +2670,9 @@ or false:
 (defn kebab->snake [s]
   (str/replace s #"-" "_"))
 
+(defn snake->kebab [s]
+  (str/replace s #"_" "-"))
+
 (defn min->hour [t]
   (int (quot t 60)))
 
@@ -2696,15 +2699,7 @@ or false:
                         :else                                              0)))
                   burn-time-matrix))
 
-(defn layer-matrix
-  [{:keys [burn-time-matrix] :as fire-spread-results} layer current-clock]
-  (if (= layer :burn-history)
-    (to-color-map-values burn-time-matrix current-clock)
-    (let [kw (->> (str (name layer) "-matrix")
-                  keyword)]
-      (get fire-spread-results kw))))
-
-(defn layer-snapshot [burn-time-matrix layer-matrix  t]
+(defn layer-snapshot [burn-time-matrix layer-matrix t]
   (m/emap (fn [layer-value burn-time]
             (if (<= burn-time t)
               layer-value
@@ -2750,29 +2745,51 @@ or false:
                                           output-time
                                           ".png")))))
 
-(defn output-simulation-layers!
-  [{:keys [output-layers]:as config}
+(def layer-name->matrix
+  [["fire_spread"         :fire-spread-matrix]
+   ["flame_length"        :flame-length-matrix]
+   ["fire_line_intensity" :fire-line-intensity-matrix]
+   ["burn_history"        :burn-time-matrix]])
+
+(defn filter-output-layers [output-layers]
+  (let [layers-to-filter (set (map (comp kebab->snake name) (keys output-layers)))]
+    (filter (fn [[name _]] (contains? layers-to-filter name)) layer-name->matrix)))
+
+(defn process-output-layers-timestepped
+  [{:keys [simulation-id] :as config}
+   {:keys [global-clock burn-time-matrix] :as fire-spread-results}
+   name layer timestep envelope]
+  (doseq [output-time (range 0 (inc global-clock) timestep)]
+    (let [matrix          (if (= layer "burn_history")
+                            (to-color-map-values layer output-time)
+                            (fire-spread-results layer))
+          filtered-matrix (layer-snapshot burn-time-matrix matrix output-time)]
+      (output-geotiff config filtered-matrix name envelope simulation-id output-time)
+      (output-png config filtered-matrix name envelope simulation-id output-time))))
+
+(defn process-output-layers!
+  [{:keys [output-layers] :as config}
    {:keys [global-clock burn-time-matrix] :as fire-spread-results}
    envelope
    simulation-id]
-  (doseq [[layer timestep] output-layers]
-    (if (int? timestep)
-      (doseq [output-time (range 0 (inc global-clock) timestep)]
-       (let [filtered-matrix (layer-snapshot burn-time-matrix
-                                             (layer-matrix fire-spread-results layer output-time)
-                                             output-time)
-             layer-name      (kebab->snake (name layer))]
-         (output-geotiff config filtered-matrix layer-name envelope simulation-id output-time)
-         (output-png config filtered-matrix layer-name envelope simulation-id output-time))))))
-
-(defn output-simulation-layers-all!
-  [config fire-spread-results envelope simulation-id]
-  (doseq [[name layer] [["fire_spread"         :fire-spread-matrix]
-                        ["flame_length"        :flame-length-matrix]
-                        ["fire_line_intensity" :fire-line-intensity-matrix]]]
-    (let [matrix (fire-spread-results layer)]
-      (output-geotiff config matrix name envelope simulation-id)
-      (output-png config matrix name envelope simulation-id))))
+  (let [layers (if output-layers
+                 (filter-output-layers output-layers)
+                 layer-name->matrix)]
+    (doseq [[name layer] layers]
+      (let [kw       (keyword (snake->kebab name))
+            timestep (get output-layers kw)]
+        (if (int? timestep)
+          (process-output-layers-timestepped config
+                                             fire-spread-results
+                                             name
+                                             layer
+                                             timestep
+                                             envelope)
+          (let [matrix (if (= layer "burn_history")
+                         (to-color-map-values layer global-clock)
+                         (fire-spread-results layer))]
+            (output-geotiff config matrix name envelope simulation-id)
+            (output-png config matrix name envelope simulation-id)))))))
 
 (defn process-burn-count!
   [{:keys [fire-spread-matrix burn-time-matrix global-clock]}
@@ -2838,9 +2855,7 @@ or false:
                                                                    (perturbations i))}
                                      initial-ignition-site)]
          (do
-           (if output-layers
-             (output-simulation-layers! config fire-spread-results envelope i)
-             (output-simulation-layers-all! config fire-spread-results envelope i))
+           (process-output-layers! config fire-spread-results envelope i)
            (when-let [timestep output-burn-probability]
              (process-burn-count! fire-spread-results burn-count-matrix timestep))
            (if output-csvs?
