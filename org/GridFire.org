@@ -3301,10 +3301,44 @@ as designated by the `:cell-size` must be exact multiples of one another.
 
 ** Section 5: Types and names of outputs
 
+Currently supported Geotiff layers for output
+- fire-spread
+- flame-length
+- fire-line-intensity
+- burn-history
+
+To control the layers to output include the following mappings:
+- *output-layers*: map of layers-name to timestep (in minutes) or the keyword `:final`
+- *output-geotiff*: boolean
+
+#+begin_src clojure
+{:output-layers  {:fire-spread  10
+                  :burn-history :final}
+ :output-geotiff true}
+#+end_src
+
+The configuration above specify that we'd like to output one firespread
+geotiff every 10 minutes in the simulation. For the burn history we'd like
+to output the geotiff file at the final timestep of the simulation.
+
+*Note:* if entry for output-layers is omitted but :output-geotiff is set to true
+then Gridfire will output all layers above at the final timestep.
+
+Gridfire also supports an output for the burn probability layer which is
+a matrix of the probability of a cell being burned across all simulations.
+To control the output of the burn probability layer include the following
+mappings:
+- *output-*burn-probability*: timestep (in minutes) or keyword `:final`
+
+#+begin_src clojure
+{:output-burn-probability 10
+ :output-geotiff          true}
+#+end_src
+
+Other output mappings:
 #+begin_src clojure
 {:outfile-suffix          "_tile_100"
  :output-landfire-inputs? true
- :output-geotiffs?        true
  :output-pngs?            true
  :output-csvs?            true}
 #+end_src
