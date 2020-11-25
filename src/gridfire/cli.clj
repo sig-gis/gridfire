@@ -198,15 +198,15 @@
           burn-time-matrix))
 
 (defn output-filename [name outfile-suffix simulation-id output-time ext]
-  (str (str/join "_"
-             (remove nil? [name
-                           outfile-suffix
-                           simulation-id
-                           (when output-time
-                             (str "t" output-time))]))
-       ext))
+  (as-> [name outfile-suffix simulation-id (when output-time (str "t" output-time))] $
+       (remove str/blank? $)
+       (str/join "_" $)
+       (str $ ext)))
 
 (defn output-geotiff
+  ([config matrix name envelope]
+   (output-geotiff config matrix name envelope nil nil))
+
   ([config matrix name envelope simulation-id]
    (output-geotiff config matrix name envelope simulation-id nil))
 
@@ -216,11 +216,14 @@
      (-> (matrix-to-raster name matrix envelope)
          (write-raster (output-filename name
                                         outfile-suffix
-                                        simulation-id
+                                        (str simulation-id)
                                         output-time
                                         ".tif"))))))
 
 (defn output-png
+  ([config matrix name envelope]
+   (output-png config matrix name envelope nil nil))
+
   ([config matrix name envelope simulation-id]
    (output-png config matrix name envelope simulation-id nil))
 
@@ -231,7 +234,7 @@
                          matrix
                          (output-filename name
                                           outfile-suffix
-                                          simulation-id
+                                          (str simulation-id)
                                           output-time
                                           ".png")))))
 
@@ -285,31 +288,39 @@
   [{:keys [fire-spread-matrix burn-time-matrix global-clock]}
    burn-count-matrix
    timestep]
-  (doseq [clock (range 0 (inc global-clock) timestep)]
-    (let [filtered-fire-spread (m/emap (fn [layer-value burn-time]
-                                         (if (<= burn-time clock)
-                                           layer-value
-                                           0))
-                                       fire-spread-matrix
-                                       burn-time-matrix)
-          band                 (int (quot clock timestep))]
-      (m/add! (nth (seq burn-count-matrix) band) filtered-fire-spread))))
+  (if (int? timestep)
+   (doseq [clock (range 0 (inc global-clock) timestep)]
+     (let [filtered-fire-spread (m/emap (fn [layer-value burn-time]
+                                          (if (<= burn-time clock)
+                                            layer-value
+                                            0))
+                                        fire-spread-matrix
+                                        burn-time-matrix)
+           band                 (int (quot clock timestep))]
+       (m/add! (nth (seq burn-count-matrix) band) filtered-fire-spread)))
+   (m/add! burn-count-matrix fire-spread-matrix)))
 
 (defn output-burn-probability-layer!
   [{:keys [output-burn-probability simulations] :as config} envelope burn-count-matrix]
   (when-let [timestep output-burn-probability]
-    (doseq [[band matrix] (map-indexed vector burn-count-matrix)]
-      (let [output-name        "burn_probability"
-            output-time        (* band timestep)
-            probability-matrix (m/emap #(/ % simulations) matrix)]
-        (output-geotiff config probability-matrix output-name envelope nil output-time)
-        (output-png config probability-matrix output-name envelope nil output-time)))))
+    (let [output-name "burn_probability"]
+      (if (int? timestep)
+        (doseq [[band matrix] (map-indexed vector burn-count-matrix)]
+          (let [output-time        (* band timestep)
+                probability-matrix (m/emap #(/ % simulations) matrix)]
+            (output-geotiff config probability-matrix output-name envelope nil output-time)
+            (output-png config probability-matrix output-name envelope nil output-time)))
+        (let [probability-matrix (m/emap #(/ % simulations) burn-count-matrix)]
+          (output-geotiff config probability-matrix output-name envelope)
+          (output-png config probability-matrix output-name envelope))))))
 
 (defn initialize-burn-count-matrix
   [{:keys [output-burn-probability]} max-runtime num-rows num-cols]
   (when output-burn-probability
-    (let [num-bands (inc (quot (apply max max-runtime) output-burn-probability))]
-      (m/zero-array [num-bands num-rows num-cols ]))))
+    (if (int? output-burn-probability)
+     (let [num-bands (inc (quot (apply max max-runtime) output-burn-probability))]
+       (m/zero-array [num-bands num-rows num-cols]))
+     (m/zero-array [num-rows num-cols]))))
 
 (defn run-simulations
   [{:keys
