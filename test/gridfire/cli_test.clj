@@ -1,9 +1,10 @@
 (ns gridfire.cli-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.core.matrix :as m]
+            [clojure.test :refer [deftest is testing]]
             [gridfire.cli :as cli]
+            [gridfire.crown-fire :refer [m->ft]]
             [gridfire.fetch :as fetch]
-            [gridfire.perturbation :as perturbation]
-            [gridfire.crown-fire :refer [m->ft]])
+            [gridfire.perturbation :as perturbation])
   (:import java.util.Random))
 
 ;;-----------------------------------------------------------------------------
@@ -52,22 +53,25 @@
   (str resources-path filename))
 
 (defn run-simulation [config]
-  (let [simulations       (:simulations config)
-        rand-generator    (if-let [seed (:random-seed config)]
-                            (Random. seed)
-                            (Random.))
-        landfire-layers   (cli/fetch-landfire-layers config)
-        landfire-matrix   (into {} (map (fn [[layer-name info]] [layer-name (:matrix info)])) landfire-layers)
+  (let [landfire-layers   (cli/fetch-landfire-layers config)
+        landfire-rasters  (into {} (map (fn [[layer info]] [layer (:matrix info)])) landfire-layers)
+        ignition-raster   (fetch/initial-ignition-layers config)
         weather-layers    (cli/fetch-weather-layers config)
         multiplier-lookup (cli/create-multiplier-lookup config weather-layers)
-        ignition-raster   (fetch/initial-ignition-layers config)]
+        envelope          (cli/get-envelope config landfire-layers)
+        simulations       (:simulations config)
+        rand-generator    (if-let [seed (:random-seed config)] (Random. seed) (Random.))
+        max-runtimes      (cli/draw-samples rand-generator simulations (:max-runtime config))
+        num-rows          (m/row-count (:fuel-model landfire-rasters))
+        num-cols          (m/column-count (:fuel-model landfire-rasters))
+        burn-count-matrix (cli/initialize-burn-count-matrix config max-runtimes num-rows num-cols)]
     (cli/run-simulations
      config
-     landfire-matrix
-     (cli/get-envelope config landfire-layers)
+     landfire-rasters
+     envelope
      (cli/draw-samples rand-generator simulations (:ignition-row config))
      (cli/draw-samples rand-generator simulations (:ignition-col config))
-     (cli/draw-samples rand-generator simulations (:max-runtime config))
+     max-runtimes
      (cli/get-weather config rand-generator :temperature weather-layers)
      (cli/get-weather config rand-generator :relative-humidity weather-layers)
      (cli/get-weather config rand-generator :wind-speed-20ft weather-layers)
@@ -76,7 +80,8 @@
      (cli/draw-samples rand-generator simulations (:ellipse-adjustment-factor config))
      ignition-raster
      multiplier-lookup
-     (perturbation/draw-samples rand-generator simulations (:perturbations config)))))
+     (perturbation/draw-samples rand-generator simulations (:perturbations config))
+     burn-count-matrix)))
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
