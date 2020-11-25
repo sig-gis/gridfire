@@ -3321,7 +3321,7 @@ The configuration above specify that we'd like to output one firespread
 geotiff every 10 minutes in the simulation. For the burn history we'd like
 to output the geotiff file at the final timestep of the simulation.
 
-*Note:* if entry for `:output-layers` is omitted but `:output-geotiff` is 
+*Note:* if entry for `:output-layers` is omitted but `:output-geotiff` is
 set to true then Gridfire will output all layers above at the final timestep.
 
 Gridfire also supports an output for the burn probability layer which is
