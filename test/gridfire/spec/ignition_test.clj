@@ -15,4 +15,4 @@
   (let [sql {:path        "/some/path/to.tif"
              :burn-values {:burned   1.0
                            :unburned -1.0}}]
-    (is (s/valid? ::sut/ignition-layer sql))))
+    (is (s/valid? ::ignition/ignition-layer sql))))

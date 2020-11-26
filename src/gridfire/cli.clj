@@ -427,10 +427,14 @@
                    (* width scalex)
                    (* -1.0 height scaley))))
 
-(defn get-weather [config rand-generator weather-type weather-layers]
-  (if (contains? weather-layers weather-type)
-    (get-in weather-layers [weather-type :matrix])
-    (draw-samples rand-generator (:simulations config) (config weather-type))))
+(defn get-weather
+  ([config rand-generator weather-type]
+   (get-weather config rand-generator weather-type nil))
+
+  ([config rand-generator weather-type weather-layers]
+   (if (and weather-layers (contains? weather-layers weather-type))
+     (get-in weather-layers [weather-type :matrix])
+     (draw-samples rand-generator (:simulations config) (config weather-type)))))
 
 (defn fetch-weather-layers [config]
   (reduce (fn [acc layer]
@@ -447,11 +451,6 @@
                (assoc acc k (int (quot (m->ft scalex) cell-size))))
              {}
              weather-layers))
-
-(defn print-error [err config]
-  (prn "CONFIG ERROR for:")
-  (clojure.pprint/pprint config)
-  (prn err))
 
 (defn -main
   [& config-files]
