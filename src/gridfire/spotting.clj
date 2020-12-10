@@ -132,7 +132,9 @@
   (let [step         (/ cell-size 2)
         cell-center  (mapv #(+ step (* % step)) cell)
         coord-deltas (deltas-wind-dir->coord deltas wind-direction)]
-    (->> coord-deltas
-         (map #(map + % cell-center))
-         (map #(map quot % [step step])))))
+    (map (comp
+          #(map int %)
+          #(map quot % [step step])
+          #(map + % cell-center))
+         coord-deltas)))
 ;; Spotting Model Forumulas:1 ends here
