@@ -100,30 +100,17 @@
         (- 360 (Math/abs delta))
         delta))))
 
-(defn deltas-wind-dir->coord
-  "converts deltas from the torched tree in the wind direction to deltas
+(defn deltas-wind->coord
+  "Converts deltas from the torched tree in the wind direction to deltas
   in the coordinate plane"
   [deltas wind-direction]
-  (map (fn [[x y]]
-         (let [H  (hypotenuse x y)
+  (map (fn [[d-paral d-perp]]
+         (let [H  (hypotenuse d-paral d-perp)
                t1 wind-direction
-               t2 (rad->deg (Math/atan (/ (Math/abs y) (Math/abs x))))
-               t3 (theta-3 y t1 t2)
-               t4 (cond
-                    (<   0 t3  90) (- 90  t3)
-                    (<  90 t3 180) (- t3  90)
-                    (< 180 t3 270) (- 270 t3)
-                    (< 270 t3 360) (- t3 270)
-                    :else          t3)]
-           (let [x-dir (if (<= 0 t3 180) 1 -1)
-                 y-dir (if (or (<= t3 90) (>= t3 270)) 1 -1)]
-             (case t4
-               (or 0 360) [0         H]
-               90         [H         0]
-               180        [0     (- H)]
-               270        [(- H)     0]
-               [(* H (Math/cos (deg->rad t4)) x-dir)
-                (* H (Math/sin (deg->rad t4)) y-dir)]))))
+               t2 (rad->deg (Math/atan (/ d-perp d-paral)))
+               t3 (+ t1 t2)]
+           [(* H (Math/sin (deg->rad t3)))
+            (* H (Math/cos (deg->rad t3)))]))
        deltas))
 
 (defn firebrands
@@ -133,8 +120,8 @@
         cell-center  (mapv #(+ step (* % step)) cell)
         coord-deltas (deltas-wind-dir->coord deltas wind-direction)]
     (map (comp
-          #(map int %)
-          #(map quot % [step step])
-          #(map + % cell-center))
+          (partial map int)
+          (partial map quot [step step])
+          (partial map + cell-center))
          coord-deltas)))
 ;; Spotting Model Forumulas:1 ends here
