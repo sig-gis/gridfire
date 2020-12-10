@@ -75,11 +75,10 @@
   x: parallel to the wind
   y: perpendicular to the wind (positive values are to the right of wind direction)
   "
-  [{:keys [firebrand-count fire-line-intensity spotting] :as constants} wind-speed-20ft temperature i j]
-  (let [{:keys
-         [ambient-gas-density
-          specific-heat-gas]} spotting
-        intensity             (m/mget fire-line-intensity i j)
+  [{:keys [fire-line-intensity] :as constants}
+   {:keys [num-firebrands ambient-gas-density specific-heat-gas]}
+   wind-speed-20ft temperature i j]
+  (let [intensity             (m/mget fire-line-intensity i j)
         froude                (froude-number intensity wind-speed-20ft temperature ambient-gas-density specific-heat-gas)
         mean                  (mean-fb froude intensity wind-speed-20ft)
         deviation             (deviation-fb froude intensity wind-speed-20ft)
