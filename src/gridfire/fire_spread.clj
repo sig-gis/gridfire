@@ -16,7 +16,8 @@
                                            wind-adjustment-factor]]
             [gridfire.perturbation :as perturbation]
             [gridfire.utils.random :refer [random-float]]
-            [mikera.vectorz.core :as v]))
+            [mikera.vectorz.core :as v]
+            [gridfire.spec.spotting :as spotting]))
 
 (m/set-current-implementation :vectorz)
 
@@ -139,7 +140,8 @@
      :flame-length        flame-length
      :fractional-distance (volatile! (if (= trajectory overflow-trajectory)
                                        overflow-heat
-                                       0.0))}))
+                                       0.0))
+     :crown-fire?         crown-fire?}))
 
 (defn calc-emc
   "Computes the Equilibrium Moisture Content (EMC) from rh (relative
@@ -268,13 +270,14 @@
   [ignited-cells timestep]
   (->> (for [[source destinations] ignited-cells
              {:keys [cell trajectory terrain-distance spread-rate flame-length
-                     fire-line-intensity fractional-distance]} destinations]
+                     fire-line-intensity fractional-distance crown-fire?]} destinations]
          (let [new-spread-fraction (/ (* spread-rate timestep) terrain-distance)
                new-total           (vreset! fractional-distance
                                             (+ @fractional-distance new-spread-fraction))]
            (if (>= new-total 1.0)
              {:cell cell :trajectory trajectory :fractional-distance @fractional-distance
-              :flame-length flame-length :fire-line-intensity fire-line-intensity})))
+              :flame-length flame-length :fire-line-intensity fire-line-intensity
+              :crown-fire crown-fire?})))
        (remove nil?)
        (group-by :cell)
        (map (fn [[cell trajectories]] (apply max-key :fractional-distance trajectories)))
@@ -305,8 +308,37 @@
                     (- fractional-distance 1.0)
                     global-clock)])))))
 
+(defn handle-spotting
+  [{:keys [wind-speed-20ft temperature multiplier-lookup perturbations] :as constants}
+   {:keys [cell] :as ignition-event}
+   global-clock
+   fire-brand-count-matrix
+   fire-spread-matrix]
+  (let [wind-speed-20ft     (sample-at cell
+                                   global-clock
+                                   wind-speed-20ft
+                                   (:wind-speed-20ft multiplier-lookup)
+                                   (:wind-speed-20ft perturbations))
+        temperature         (sample-at cell
+                                   global-clock
+                                   temperature
+                                   (:temperature multiplier-lookup)
+                                   (:temperature perturbations))
+        wind-from-direction (sample-at cell
+                                       global-clock
+                                       wind-from-direction
+                                       (:wind-from-direction multiplier-lookup)
+                                       (:wind-from-direction perturbations))]
+    (spotting/spread-firebrands constants
+                                ignition-event
+                                wind-speed-20ft
+                                wind-from-direction
+                                temperature
+                                firebrand-count-matrix
+                                fire-spread-matrix)))
+
 (defn run-loop
-  [{:keys [max-runtime cell-size initial-ignition-site] :as constants}
+  [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
    ignited-cells
    fire-spread-matrix
    flame-length-matrix
@@ -329,9 +361,11 @@
             constants       (perturbation/update-global-vals constants global-clock (+ global-clock timestep))]
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
-        (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]
+        (doseq [{:keys [cell flame-length fire-line-intensity crown-fire?] :as ignition-event} ignition-events]
           (let [[i j] cell]
-            (m/mset! fire-spread-matrix         i j 1.0)
+            (if spotting
+              (handle-spotting constants global-clock ignition-event firebrand-count-matrix fire-spread-matrix)
+              (m/mset! fire-spread-matrix         i j 1.0))
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
             (m/mset! burn-time-matrix           i j global-clock)))

@@ -13,6 +13,14 @@
   (->> (+ degrees 459.67)
        (* (/ 5 9))))
 
+(defn in-bounds? ;;TODO Duplicate from firespread. Pull out to common ns
+  "Returns true if the point lies within the bounds [0,rows) by [0,cols)."
+  [rows cols [i j]]
+  (and (>= i 0)
+       (>= j 0)
+       (< i rows)
+       (< j cols)))
+
 (defn deg->rad [d]
   (* d (/ Math/PI 180)))
 
@@ -115,4 +123,19 @@
           (partial map #(quot step %))
           (partial map + cell-center))
          coord-deltas)))
+
+(defn spread-firebrands
+  [{:keys [num-rows num-cols firebrand-count cell-size] :as constants}
+   {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
+   wind-speed-20ft
+   wind-from-direction
+   temperature
+   firebrand-count-matrix
+   fire-spread-matrix]
+  (when crown-fire?
+    (let [deltas (sample-wind-dir-deltas constants wind-speed-20ft temperature cell)]
+      (doseq [[x y] (firebrands deltas wind-from-direction cell cell-size)
+              :when (in-bounds? num-rows num-cols [x y])]
+        (let [count (m/mget firebrand-count-matrix x y)]
+          (m/mset! firebrand-count-matrix x y (inc count)))))))
 ;; Spotting Model Forumulas:1 ends here
