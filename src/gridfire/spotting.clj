@@ -1,5 +1,7 @@
 ;; [[file:../../org/GridFire.org::*Spotting Model Forumulas][Spotting Model Forumulas:1]]
-(ns gridfire.spotting)
+(ns gridfire.spotting
+  (:require [clojure.core.matrix :as m]
+            [kixi.stats.distribution :as distribution]))
 
 ;;-----------------------------------------------------------------------------
 ;; Utils
@@ -10,6 +12,12 @@
   [degrees]
   (->> (+ degrees 459.67)
        (* (/ 5 9))))
+
+(defn deg->rad [d]
+  (* d (/ Math/PI 180)))
+
+(defn rad->deg [d]
+  (* d (/ 180 Math/PI)))
 
 ;;-----------------------------------------------------------------------------
 ;; Formulas
@@ -56,4 +64,75 @@
      (Math/exp
       (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
          (* 2 (Math/pow deviation 2))))))
+
+;;-----------------------------------------------------------------------------
+;; Main
+;;-----------------------------------------------------------------------------
+
+(defn sample-wind-dir-deltas
+  "Returns a sequence of [x y] distances (meters) that firebrands land away
+  from a torched cell at i j where:
+  x: parallel to the wind
+  y: perpendicular to the wind (positive values are to the right of wind direction)
+  "
+  [{:keys [firebrand-count fire-line-intensity spotting] :as constants} wind-speed-20ft temperature i j]
+  (let [{:keys
+         [ambient-gas-density
+          specific-heat-gas]} spotting
+        intensity             (m/mget fire-line-intensity i j)
+        froude                (froude-number intensity wind-speed-20ft temperature ambient-gas-density specific-heat-gas)
+        mean                  (mean-fb froude intensity wind-speed-20ft)
+        deviation             (deviation-fb froude intensity wind-speed-20ft)
+        parallel              (distribution/log-normal {:mu mean :sd deviation})
+        perpendicular         (distribution/normal {:mu 0 :sd 0.92})]
+    (map vector
+         (distribution/sample firebrand-count parallel)
+         (distribution/sample firebrand-count perpendicular))))
+
+(defn hypotenuse [x y]
+  (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
+
+(defn- theta-3 [y t1 t2]
+  (if (pos? y)
+    (mod (+ t1 t2) 360)
+    (let [delta (- t1 t2)]
+      (if (neg? delta)
+        (- 360 (Math/abs delta))
+        delta))))
+
+(defn deltas-wind-dir->coord
+  "converts deltas from the torched tree in the wind direction to deltas
+  in the coordinate plane"
+  [deltas wind-direction]
+  (map (fn [[x y]]
+         (let [H  (hypotenuse x y)
+               t1 wind-direction
+               t2 (rad->deg (Math/atan (/ (Math/abs y) (Math/abs x))))
+               t3 (theta-3 y t1 t2)
+               t4 (cond
+                    (<   0 t3  90) (- 90  t3)
+                    (<  90 t3 180) (- t3  90)
+                    (< 180 t3 270) (- 270 t3)
+                    (< 270 t3 360) (- t3 270)
+                    :else          t3)]
+           (let [x-dir (if (<= 0 t3 180) 1 -1)
+                 y-dir (if (or (<= t3 90) (>= t3 270)) 1 -1)]
+             (case t4
+               (or 0 360) [0         H]
+               90         [H         0]
+               180        [0     (- H)]
+               270        [(- H)     0]
+               [(* H (Math/cos (deg->rad t4)) x-dir)
+                (* H (Math/sin (deg->rad t4)) y-dir)]))))
+       deltas))
+
+(defn firebrands
+  "Returns a sequence cells that firebrands land in"
+  [[x y :as deltas] wind-direction cell cell-size]
+  (let [step         (/ cell-size 2)
+        cell-center  (mapv #(+ step (* % step)) cell)
+        coord-deltas (deltas-wind-dir->coord deltas wind-direction)]
+    (->> coord-deltas
+         (map #(map + % cell-center))
+         (map #(map quot % [step step])))))
 ;; Spotting Model Forumulas:1 ends here
