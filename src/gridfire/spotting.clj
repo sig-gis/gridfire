@@ -92,14 +92,6 @@
 (defn hypotenuse [x y]
   (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
 
-(defn- theta-3 [y t1 t2]
-  (if (pos? y)
-    (mod (+ t1 t2) 360)
-    (let [delta (- t1 t2)]
-      (if (neg? delta)
-        (- 360 (Math/abs delta))
-        delta))))
-
 (defn deltas-wind->coord
   "Converts deltas from the torched tree in the wind direction to deltas
   in the coordinate plane"
