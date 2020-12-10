@@ -121,7 +121,7 @@
         coord-deltas (deltas-wind-dir->coord deltas wind-direction)]
     (map (comp
           (partial map int)
-          (partial map quot [step step])
+          (partial map #(quot step))
           (partial map + cell-center))
          coord-deltas)))
 ;; Spotting Model Forumulas:1 ends here
