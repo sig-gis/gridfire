@@ -1785,7 +1785,8 @@ pseudo-code lays out the steps taken in this procedure:
                                            wind-adjustment-factor]]
             [gridfire.perturbation :as perturbation]
             [gridfire.utils.random :refer [random-float]]
-            [mikera.vectorz.core :as v]))
+            [mikera.vectorz.core :as v]
+            [gridfire.spec.spotting :as spotting]))
 
 (m/set-current-implementation :vectorz)
 
@@ -1908,7 +1909,8 @@ pseudo-code lays out the steps taken in this procedure:
      :flame-length        flame-length
      :fractional-distance (volatile! (if (= trajectory overflow-trajectory)
                                        overflow-heat
-                                       0.0))}))
+                                       0.0))
+     :crown-fire?         crown-fire?}))
 
 (defn calc-emc
   "Computes the Equilibrium Moisture Content (EMC) from rh (relative
@@ -2037,13 +2039,14 @@ pseudo-code lays out the steps taken in this procedure:
   [ignited-cells timestep]
   (->> (for [[source destinations] ignited-cells
              {:keys [cell trajectory terrain-distance spread-rate flame-length
-                     fire-line-intensity fractional-distance]} destinations]
+                     fire-line-intensity fractional-distance crown-fire?]} destinations]
          (let [new-spread-fraction (/ (* spread-rate timestep) terrain-distance)
                new-total           (vreset! fractional-distance
                                             (+ @fractional-distance new-spread-fraction))]
            (if (>= new-total 1.0)
              {:cell cell :trajectory trajectory :fractional-distance @fractional-distance
-              :flame-length flame-length :fire-line-intensity fire-line-intensity})))
+              :flame-length flame-length :fire-line-intensity fire-line-intensity
+              :crown-fire crown-fire?})))
        (remove nil?)
        (group-by :cell)
        (map (fn [[cell trajectories]] (apply max-key :fractional-distance trajectories)))
@@ -2074,12 +2077,45 @@ pseudo-code lays out the steps taken in this procedure:
                     (- fractional-distance 1.0)
                     global-clock)])))))
 
+(defn handle-spotting
+  [{:keys [wind-speed-20ft temperature multiplier-lookup perturbations] :as constants}
+   spotting-config
+   {:keys [cell] :as ignition-event}
+   global-clock
+   firebrand-count-matrix
+   fire-spread-matrix]
+  (let [wind-speed-20ft     (sample-at cell
+                                       global-clock
+                                       wind-speed-20ft
+                                       (:wind-speed-20ft multiplier-lookup)
+                                       (:wind-speed-20ft perturbations))
+        temperature         (sample-at cell
+                                       global-clock
+                                       temperature
+                                       (:temperature multiplier-lookup)
+                                       (:temperature perturbations))
+        wind-from-direction (sample-at cell
+                                       global-clock
+                                       wind-from-direction
+                                       (:wind-from-direction multiplier-lookup)
+                                       (:wind-from-direction perturbations))]
+    (spotting/spread-firebrands (merge constants
+                                       {:wind-speed-20ft     wind-speed-20ft
+                                        :wind-from-direction wind-from-direction
+                                        :temperature         temperature})
+                                spotting-config
+                                ignition-event
+                                firebrand-count-matrix
+                                fire-spread-matrix)))
+
 (defn run-loop
-  [{:keys [max-runtime cell-size initial-ignition-site] :as constants}
+  [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
+   {:keys [spotting]}
    ignited-cells
    fire-spread-matrix
    flame-length-matrix
    fire-line-intensity-matrix
+   firebrand-count-matrix
    burn-time-matrix]
   (loop [global-clock  0.0
          ignited-cells ignited-cells]
@@ -2098,9 +2134,12 @@ pseudo-code lays out the steps taken in this procedure:
             constants       (perturbation/update-global-vals constants global-clock (+ global-clock timestep))]
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
-        (doseq [{:keys [cell flame-length fire-line-intensity]} ignition-events]
+        (doseq [{:keys [cell flame-length fire-line-intensity crown-fire?] :as ignition-event} ignition-events]
           (let [[i j] cell]
-            (m/mset! fire-spread-matrix         i j 1.0)
+            (if spotting
+              (handle-spotting constants spotting global-clock ignition-event
+                               firebrand-count-matrix fire-spread-matrix)
+              (m/mset! fire-spread-matrix         i j 1.0))
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
             (m/mset! burn-time-matrix           i j global-clock)))
@@ -2150,12 +2189,15 @@ pseudo-code lays out the steps taken in this procedure:
     (run-fire-spread constants ignition-site)))
 
 (defmethod run-fire-spread clojure.lang.PersistentVector
-  [{:keys [landfire-layers num-rows num-cols] :as constants} [i j :as initial-ignition-site]]
+  [{:keys [landfire-layers num-rows num-cols spotting] :as constants}
+   {:keys [spotting] :as config}
+   [i j :as initial-ignition-site]]
   (let [fuel-model-matrix          (:fuel-model landfire-layers)
         fire-spread-matrix         (m/zero-matrix num-rows num-cols)
         flame-length-matrix        (m/zero-matrix num-rows num-cols)
         fire-line-intensity-matrix (m/zero-matrix num-rows num-cols)
-        burn-time-matrix           (m/zero-matrix num-rows num-cols)]
+        burn-time-matrix           (m/zero-matrix num-rows num-cols)
+        firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))]
     (when (and (in-bounds? num-rows num-cols initial-ignition-site)
                (burnable-fuel-model? (m/mget fuel-model-matrix i j))
                (burnable-neighbors? fire-spread-matrix fuel-model-matrix
@@ -2175,6 +2217,7 @@ pseudo-code lays out the steps taken in this procedure:
         (run-loop (merge
                    constants
                    {:initial-ignition-site initial-ignition-site})
+                  config
                   ignited-cells
                   fire-spread-matrix
                   flame-length-matrix
@@ -2195,12 +2238,15 @@ pseudo-code lays out the steps taken in this procedure:
     [r c]))
 
 (defmethod run-fire-spread clojure.lang.PersistentHashMap
-  [{:keys [landfire-layers num-rows num-cols] :as constants} initial-ignition-raster]
+  [{:keys [landfire-layers num-rows num-cols] :as constants}
+   {:keys [spotting]}
+   initial-ignition-raster]
   (let [fire-spread-matrix         (m/mutable (:matrix initial-ignition-raster))
         non-zero-indices           (get-non-zero-indices fire-spread-matrix)
         flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices)
         fire-line-intensity-matrix (initialize-matrix num-rows num-cols non-zero-indices)
         burn-time-matrix           (initialize-matrix num-rows num-cols non-zero-indices)
+        firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))
         ignited-cells              (into {}
                                          (for [index non-zero-indices
                                                :let  [ignition-trajectories
@@ -2215,6 +2261,7 @@ pseudo-code lays out the steps taken in this procedure:
     (run-loop (merge
                constants
                {:initial-ignition-site initial-ignition-raster})
+              config
               ignited-cells
               fire-spread-matrix
               flame-length-matrix
@@ -2355,11 +2402,11 @@ algorithm.
          coord-deltas)))
 
 (defn spread-firebrands
-  [{:keys [num-rows num-cols firebrand-count cell-size] :as constants}
+  [{:keys
+    [num-rows num-cols firebrand-count cell-size wind-speed-20ft
+     wind-from-direction temperature] :as constants}
+   {:keys [firebrand-count] :as config}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
-   wind-speed-20ft
-   wind-from-direction
-   temperature
    firebrand-count-matrix
    fire-spread-matrix]
   (when crown-fire?

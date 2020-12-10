@@ -310,35 +310,38 @@
 
 (defn handle-spotting
   [{:keys [wind-speed-20ft temperature multiplier-lookup perturbations] :as constants}
+   spotting-config
    {:keys [cell] :as ignition-event}
    global-clock
    firebrand-count-matrix
    fire-spread-matrix]
   (let [wind-speed-20ft     (sample-at cell
-                                   global-clock
-                                   wind-speed-20ft
-                                   (:wind-speed-20ft multiplier-lookup)
-                                   (:wind-speed-20ft perturbations))
+                                       global-clock
+                                       wind-speed-20ft
+                                       (:wind-speed-20ft multiplier-lookup)
+                                       (:wind-speed-20ft perturbations))
         temperature         (sample-at cell
-                                   global-clock
-                                   temperature
-                                   (:temperature multiplier-lookup)
-                                   (:temperature perturbations))
+                                       global-clock
+                                       temperature
+                                       (:temperature multiplier-lookup)
+                                       (:temperature perturbations))
         wind-from-direction (sample-at cell
                                        global-clock
                                        wind-from-direction
                                        (:wind-from-direction multiplier-lookup)
                                        (:wind-from-direction perturbations))]
-    (spotting/spread-firebrands constants
+    (spotting/spread-firebrands (merge constants
+                                       {:wind-speed-20ft     wind-speed-20ft
+                                        :wind-from-direction wind-from-direction
+                                        :temperature         temperature})
+                                spotting-config
                                 ignition-event
-                                wind-speed-20ft
-                                wind-from-direction
-                                temperature
                                 firebrand-count-matrix
                                 fire-spread-matrix)))
 
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
+   {:keys [spotting]}
    ignited-cells
    fire-spread-matrix
    flame-length-matrix
@@ -365,7 +368,8 @@
         (doseq [{:keys [cell flame-length fire-line-intensity crown-fire?] :as ignition-event} ignition-events]
           (let [[i j] cell]
             (if spotting
-              (handle-spotting constants global-clock ignition-event firebrand-count-matrix fire-spread-matrix)
+              (handle-spotting constants spotting global-clock ignition-event
+                               firebrand-count-matrix fire-spread-matrix)
               (m/mset! fire-spread-matrix         i j 1.0))
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
@@ -416,7 +420,9 @@
     (run-fire-spread constants ignition-site)))
 
 (defmethod run-fire-spread clojure.lang.PersistentVector
-  [{:keys [landfire-layers num-rows num-cols spotting] :as constants} [i j :as initial-ignition-site]]
+  [{:keys [landfire-layers num-rows num-cols spotting] :as constants}
+   {:keys [spotting] :as config}
+   [i j :as initial-ignition-site]]
   (let [fuel-model-matrix          (:fuel-model landfire-layers)
         fire-spread-matrix         (m/zero-matrix num-rows num-cols)
         flame-length-matrix        (m/zero-matrix num-rows num-cols)
@@ -442,6 +448,7 @@
         (run-loop (merge
                    constants
                    {:initial-ignition-site initial-ignition-site})
+                  config
                   ignited-cells
                   fire-spread-matrix
                   flame-length-matrix
@@ -462,7 +469,9 @@
     [r c]))
 
 (defmethod run-fire-spread clojure.lang.PersistentHashMap
-  [{:keys [landfire-layers num-rows num-cols] :as constants} initial-ignition-raster]
+  [{:keys [landfire-layers num-rows num-cols] :as constants}
+   {:keys [spotting]}
+   initial-ignition-raster]
   (let [fire-spread-matrix         (m/mutable (:matrix initial-ignition-raster))
         non-zero-indices           (get-non-zero-indices fire-spread-matrix)
         flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices)
@@ -483,6 +492,7 @@
     (run-loop (merge
                constants
                {:initial-ignition-site initial-ignition-raster})
+              config
               ignited-cells
               fire-spread-matrix
               flame-length-matrix

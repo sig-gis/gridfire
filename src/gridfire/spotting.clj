@@ -125,15 +125,13 @@
          coord-deltas)))
 
 (defn spread-firebrands
-  [{:keys [num-rows num-cols firebrand-count cell-size] :as constants}
+  [{:keys [num-rows num-cols cell-size wind-speed-20ft wind-from-direction temperature] :as constants}
+   {:keys [num-firebrands] :as spot-config}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
-   wind-speed-20ft
-   wind-from-direction
-   temperature
    firebrand-count-matrix
    fire-spread-matrix]
   (when crown-fire?
-    (let [deltas (sample-wind-dir-deltas constants wind-speed-20ft temperature cell)]
+    (let [deltas (sample-wind-dir-deltas constants spot-config wind-speed-20ft temperature cell)]
       (doseq [[x y] (firebrands deltas wind-from-direction cell cell-size)
               :when (in-bounds? num-rows num-cols [x y])]
         (let [count (m/mget firebrand-count-matrix x y)]

@@ -352,10 +352,9 @@
                                       :num-rows                  (m/row-count (:fuel-model landfire-rasters))
                                       :num-cols                  (m/column-count (:fuel-model landfire-rasters))
                                       :multiplier-lookup         multiplier-lookup
-                                      :firebrand-count           (:firebrand-count config)
                                       :perturbations             (when perturbations
-                                                                   (perturbations i))
-                                      :spotting                  (:spotting config)}
+                                                                   (perturbations i))}
+                                     config
                                      initial-ignition-site)]
          (do
            (process-output-layers! config fire-spread-results envelope i)
