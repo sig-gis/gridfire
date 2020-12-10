@@ -4,9 +4,9 @@
 
 (s/def ::ambient-gas-density float?)
 (s/def ::specific-heat-gas float?)
-(s/def ::firebrand-count int?)
+(s/def ::num-firebrands int?)
 
 (s/def ::spotting
   (one-or-more-keys [::ambient-gas-density
                      ::specific-heat-gas
-                     ::firebrand-count]))
+                     ::num-firebrands]))
