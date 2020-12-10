@@ -85,8 +85,8 @@
         parallel              (distribution/log-normal {:mu mean :sd deviation})
         perpendicular         (distribution/normal {:mu 0 :sd 0.92})]
     (map vector
-         (distribution/sample firebrand-count parallel)
-         (distribution/sample firebrand-count perpendicular))))
+         (distribution/sample num-firebrands parallel)
+         (distribution/sample num-firebrands perpendicular))))
 
 (defn hypotenuse [x y]
   (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
