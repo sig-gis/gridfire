@@ -117,7 +117,7 @@
   [[x y :as deltas] wind-direction cell cell-size]
   (let [step         (/ cell-size 2)
         cell-center  (mapv #(+ step (* % step)) cell)
-        coord-deltas (deltas-wind-dir->coord deltas wind-direction)]
+        coord-deltas (deltas-wind->coord deltas wind-direction)]
     (map (comp
           (partial map int)
           (partial map #(quot step %))

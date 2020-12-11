@@ -17,7 +17,7 @@
             [gridfire.perturbation :as perturbation]
             [gridfire.utils.random :refer [random-float]]
             [mikera.vectorz.core :as v]
-            [gridfire.spec.spotting :as spotting]))
+            [gridfire.spotting :as spot]))
 
 (m/set-current-implementation :vectorz)
 
@@ -309,7 +309,7 @@
                     global-clock)])))))
 
 (defn handle-spotting
-  [{:keys [wind-speed-20ft temperature multiplier-lookup perturbations] :as constants}
+  [{:keys [wind-speed-20ft wind-from-direction temperature multiplier-lookup perturbations] :as constants}
    spotting-config
    {:keys [cell] :as ignition-event}
    global-clock
@@ -330,7 +330,7 @@
                                        wind-from-direction
                                        (:wind-from-direction multiplier-lookup)
                                        (:wind-from-direction perturbations))]
-    (spotting/spread-firebrands (merge constants
+    (spot/spread-firebrands (merge constants
                                        {:wind-speed-20ft     wind-speed-20ft
                                         :wind-from-direction wind-from-direction
                                         :temperature         temperature})
@@ -409,9 +409,9 @@
   - num-rows: integer
   - num-cols: integer"
   (fn
-    ([constants] :add-default)
+    ([constants config] :add-default)
 
-    ([constants initial-ignition-site]
+    ([constants config initial-ignition-site]
      (type initial-ignition-site))))
 
 (defmethod run-fire-spread :add-default
@@ -453,6 +453,7 @@
                   fire-spread-matrix
                   flame-length-matrix
                   fire-line-intensity-matrix
+                  firebrand-count-matrix
                   burn-time-matrix)))))
 
 (defn- initialize-matrix
@@ -470,7 +471,7 @@
 
 (defmethod run-fire-spread clojure.lang.PersistentHashMap
   [{:keys [landfire-layers num-rows num-cols] :as constants}
-   {:keys [spotting]}
+   {:keys [spotting] :as config}
    initial-ignition-raster]
   (let [fire-spread-matrix         (m/mutable (:matrix initial-ignition-raster))
         non-zero-indices           (get-non-zero-indices fire-spread-matrix)
@@ -497,5 +498,6 @@
               fire-spread-matrix
               flame-length-matrix
               fire-line-intensity-matrix
+              firebrand-count-matrix
               burn-time-matrix)))
 ;; fire-spread-algorithm ends here
