@@ -1786,7 +1786,7 @@ pseudo-code lays out the steps taken in this procedure:
             [gridfire.perturbation :as perturbation]
             [gridfire.utils.random :refer [random-float]]
             [mikera.vectorz.core :as v]
-            [gridfire.spec.spotting :as spotting]))
+            [gridfire.spotting :as spot]))
 
 (m/set-current-implementation :vectorz)
 
@@ -2078,7 +2078,7 @@ pseudo-code lays out the steps taken in this procedure:
                     global-clock)])))))
 
 (defn handle-spotting
-  [{:keys [wind-speed-20ft temperature multiplier-lookup perturbations] :as constants}
+  [{:keys [wind-speed-20ft wind-from-direction temperature multiplier-lookup perturbations] :as constants}
    spotting-config
    {:keys [cell] :as ignition-event}
    global-clock
@@ -2099,7 +2099,7 @@ pseudo-code lays out the steps taken in this procedure:
                                        wind-from-direction
                                        (:wind-from-direction multiplier-lookup)
                                        (:wind-from-direction perturbations))]
-    (spotting/spread-firebrands (merge constants
+    (spot/spread-firebrands (merge constants
                                        {:wind-speed-20ft     wind-speed-20ft
                                         :wind-from-direction wind-from-direction
                                         :temperature         temperature})
@@ -2178,9 +2178,9 @@ pseudo-code lays out the steps taken in this procedure:
   - num-rows: integer
   - num-cols: integer"
   (fn
-    ([constants] :add-default)
+    ([constants config] :add-default)
 
-    ([constants initial-ignition-site]
+    ([constants config initial-ignition-site]
      (type initial-ignition-site))))
 
 (defmethod run-fire-spread :add-default
@@ -2222,6 +2222,7 @@ pseudo-code lays out the steps taken in this procedure:
                   fire-spread-matrix
                   flame-length-matrix
                   fire-line-intensity-matrix
+                  firebrand-count-matrix
                   burn-time-matrix)))))
 
 (defn- initialize-matrix
@@ -2239,7 +2240,7 @@ pseudo-code lays out the steps taken in this procedure:
 
 (defmethod run-fire-spread clojure.lang.PersistentHashMap
   [{:keys [landfire-layers num-rows num-cols] :as constants}
-   {:keys [spotting]}
+   {:keys [spotting] :as config}
    initial-ignition-raster]
   (let [fire-spread-matrix         (m/mutable (:matrix initial-ignition-raster))
         non-zero-indices           (get-non-zero-indices fire-spread-matrix)
@@ -2266,6 +2267,7 @@ pseudo-code lays out the steps taken in this procedure:
               fire-spread-matrix
               flame-length-matrix
               fire-line-intensity-matrix
+              firebrand-count-matrix
               burn-time-matrix)))
 #+end_src
 
@@ -2394,7 +2396,7 @@ algorithm.
   [[x y :as deltas] wind-direction cell cell-size]
   (let [step         (/ cell-size 2)
         cell-center  (mapv #(+ step (* % step)) cell)
-        coord-deltas (deltas-wind-dir->coord deltas wind-direction)]
+        coord-deltas (deltas-wind->coord deltas wind-direction)]
     (map (comp
           (partial map int)
           (partial map #(quot step %))
