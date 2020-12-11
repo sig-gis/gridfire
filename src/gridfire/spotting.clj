@@ -56,4 +56,4 @@
      (Math/exp
       (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
          (* 2 (Math/pow deviation 2))))))
-
+;; Spotting Model Forumulas:1 ends here
