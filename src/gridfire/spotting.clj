@@ -1,6 +1,14 @@
 ;; [[file:../../org/GridFire.org::*Spotting Model Forumulas][Spotting Model Forumulas:1]]
 (ns gridfire.spotting
   (:require [clojure.core.matrix :as m]
+            [gridfire.common :refer [sample-at
+                                     distance-3d
+                                     fuel-moisture
+                                     in-bounds?]]
+            [gridfire.fuel-models :refer [build-fuel-model
+                                          moisturize
+                                          size-class-sum
+                                          category-sum]]
             [kixi.stats.distribution :as distribution]))
 
 ;;-----------------------------------------------------------------------------
@@ -12,14 +20,6 @@
   [degrees]
   (->> (+ degrees 459.67)
        (* (/ 5 9))))
-
-(defn in-bounds? ;;TODO Duplicate from firespread. Pull out to common ns
-  "Returns true if the point lies within the bounds [0,rows) by [0,cols)."
-  [rows cols [i j]]
-  (and (>= i 0)
-       (>= j 0)
-       (< i rows)
-       (< j cols)))
 
 (defn deg->rad [d]
   (* d (/ Math/PI 180)))
@@ -72,6 +72,66 @@
      (Math/exp
       (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
          (* 2 (Math/pow deviation 2))))))
+
+(defn specific-heat-dry-fuel [t]
+  (+ 0.266 0.0016 (/ (+ 320 t) 2)))
+
+(defn heat-of-preignition
+  [init-temperature ignition-temperature moisture]
+  (let [T_o init-temperature
+        T_i ignition-temperature
+        M   moisture
+        c_f (specific-heat-dry-fuel T_o T_i)
+
+        ;; heat required to reach ignition temperature
+        Q_a (* (- T_i T_o) c_f)
+
+        ;; heat required to raise moisture to reach boiling point
+        Q_b (* (- 100 T_o) M)
+
+        ;; Heat of desorption
+        Q_c (* 18.54 (- 1 (Math/exp (* -15.1 M))))
+
+        ;; Heat required to vaporize moisture
+        Q_d (* 540 M)]
+    (+ Q_a Q_b Q_c Q_d)))
+
+(defn schroeder-ignition-probability [fuel-model-number relative-humidity temperature]
+  (let [ignition-temperature 320 ;;TODO should this be a constant?
+        fuel-moisture        (fuel-moisture relative-humidity temperature)
+        moisture             (->> (build-fuel-model (int (fuel-model-number)))
+                                  (moisturize fuel-moisture)
+                                  :M_f
+                                  size-class-sum
+                                  category-sum)
+        Q_ig                 (heat-of-preignition temperature ignition-temperature moisture)
+        X                    (/ (- 400 Q_ig) 10)]
+    (/ (* 0.000048 (Math/pow X 4.3)) 50)))
+
+(defn spot-ignition-probability
+  [{:keys
+    [cell-size global-clock landfire-layers relative-humidity temperature
+     multiplier-lookup perturbations]}
+   {:keys [decay-constant] :as spot-config}
+   firebrand-count-matrix
+   torched-origin
+   [i j :as here]]
+  (let [fuel-model-number (m/mget (:fuel-model landfire-layers) i j)
+        temperature       (sample-at here
+                                     global-clock
+                                     temperature
+                                     (:temperature multiplier-lookup)
+                                     (:temperature perturbations))
+        relative-hu-idity (sample-at here
+                                     global-clock
+                                     relative-humidity
+                                     (:relative-humidity multiplier-lookup)
+                                     (:relative-humidity perturbations))
+        p                 (schroeder-ignition-probability fuel-model-number relative-humidity temperature)
+        distance          (distance-3d (:elevation landfire-layers) cell-size here torched-origin)
+        decay-factor      (Math/exp (* decay-constant distance))
+        firebrand-count   (m/mget firebrand-count-matrix i j)]
+    (- 1 (Math/pow (- 1 (* p decay-factor)) firebrand-count))))
 
 ;;-----------------------------------------------------------------------------
 ;; Main
