@@ -331,13 +331,13 @@
                                        (:wind-from-direction multiplier-lookup)
                                        (:wind-from-direction perturbations))]
     (spot/spread-firebrands (merge constants
-                                       {:wind-speed-20ft     wind-speed-20ft
-                                        :wind-from-direction wind-from-direction
-                                        :temperature         temperature})
-                                spotting-config
-                                ignition-event
-                                firebrand-count-matrix
-                                fire-spread-matrix)))
+                                   {:wind-speed-20ft     wind-speed-20ft
+                                    :wind-from-direction wind-from-direction
+                                    :temperature         temperature})
+                            spotting-config
+                            ignition-event
+                            firebrand-count-matrix
+                            fire-spread-matrix)))
 
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
