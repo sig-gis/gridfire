@@ -28,6 +28,18 @@
        (< i rows)
        (< j cols)))
 
+(defn burnable-fuel-model?
+  [^double number]
+  (and (pos? number)
+       (or (< number 91.0)
+           (> number 99.0))))
+
+(defn burnable?
+  "Returns true if cell [i j] has not yet been ignited (but could be)."
+  [fire-spread-matrix fuel-model-matrix [i j]]
+  (and (zero? (m/mget fire-spread-matrix i j))
+       (burnable-fuel-model? (m/mget fuel-model-matrix i j))))
+
 (defn distance-3d
   "Returns the terrain distance between two points in feet."
   [elevation-matrix cell-size [i1 j1] [i2 j2]]
