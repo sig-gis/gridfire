@@ -295,7 +295,7 @@
                     (- fractional-distance 1.0)
                     global-clock)])))))
 
-(defn ignited-cells [constants fire-spread-matrix cells]
+(defn generate-ignited-cells [constants fire-spread-matrix cells]
   (when (seq cells)
     (into {}
           (for [cell cells]
@@ -309,20 +309,24 @@
 
 (defn identify-spot-ignition-events
   [global-clock spot-ignited-cells]
-  (let [to-ignite-now (group-by (fn [[cell [time ign-prob]]] (> global-clock time)))
-        ignite-later  (:false to-ignite-now)
-        ignite-now    (:true to-ignite-now)]
+  (let [to-ignite-now (group-by (fn [[cell [time ign-prob]]]
+                                  (> global-clock time))
+                                spot-ignited-cells)
+        ignite-later  (or (:false to-ignite-now) {})
+        ignite-now    (or (:true to-ignite-now) {})]
     [ignite-later ignite-now]))
 
 (defn handle-spotting
   [constants global-clock temp-spot-cells spot-ignite-later fire-spread-matrix ignited-cells]
-  (let [spot-ignite-later  (or (some->> (seq @temp-spot-cells)
-                                        (merge-with (partial min-key first) spot-ignite-later))
-                               spot-ignite-later)
+  (let [spot-ignite-later      (merge-with (partial min-key first) spot-ignite-later @temp-spot-cells)
         [spot-ignite-later
-         spot-ignite-now]  (identify-spot-ignition-events spot-ignite-later global-clock)
-        spot-ignited-cells (ignited-cells constants fire-spread-matrix (keys spot-ignite-now))
-        ignited-cells      (merge ignited-cells spot-ignited-cells)]
+         spot-ignite-now]      (identify-spot-ignition-events global-clock spot-ignite-later)
+        cells                  (keys spot-ignite-now)
+        ignition-probabilities (map (comp second val) spot-ignite-now)
+        spot-ignited-cells     (generate-ignited-cells constants
+                                                       fire-spread-matrix
+                                                       cells)
+        ignited-cells          (merge ignited-cells spot-ignited-cells)]
     (doseq [cell spot-ignite-now
             :let [[i j]                    (key cell)
                   [_ ignition-probability] (val cell)]]
@@ -487,7 +491,7 @@
         fire-line-intensity-matrix (initialize-matrix num-rows num-cols non-zero-indices)
         burn-time-matrix           (initialize-matrix num-rows num-cols non-zero-indices)
         firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))
-        ignited-cells              (ignited-cells constants fire-spread-matrix non-zero-indices)]
+        ignited-cells              (generate-ignited-cells constants fire-spread-matrix non-zero-indices)]
     (run-loop (merge
                constants
                {:initial-ignition-site initial-ignition-raster})
