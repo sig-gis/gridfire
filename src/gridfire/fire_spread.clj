@@ -386,8 +386,8 @@
                                                                  fire-spread-matrix
                                                                  ignited-cells)]
           (recur next-global-clock
-                 spot-ignite-later
-                 (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix global-clock))))
+                 (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix global-clock)
+                 spot-ignite-later)))
       {:global-clock               global-clock
        :initial-ignition-site      initial-ignition-site
        :ignited-cells              (keys ignited-cells)
