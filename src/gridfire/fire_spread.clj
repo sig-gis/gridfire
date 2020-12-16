@@ -323,10 +323,10 @@
          spot-ignite-now]  (identify-spot-ignition-events spot-ignite-later global-clock)
         spot-ignited-cells (ignited-cells constants fire-spread-matrix (keys spot-ignite-now))
         ignited-cells      (merge ignited-cells spot-ignited-cells)]
-    (doseq [cell spot-ignite-now]
-      (let [[i j]                    (key cell)
-            [_ ignition-probability] (val cell)]
-        (m/mset! fire-spread-matrix         i j 1.0)))
+    (doseq [cell spot-ignite-now
+            :let [[i j]                    (key cell)
+                  [_ ignition-probability] (val cell)]]
+      (m/mset! fire-spread-matrix i j 1.0))
     [spot-ignite-later ignited-cells]))
 
 (defn run-loop
