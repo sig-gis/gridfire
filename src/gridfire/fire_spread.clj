@@ -228,7 +228,7 @@
     (into {}
           (concat
            (for [[cell spread-info] ignited-cells
-                 :let               [{:keys [ignition-probability]} spread-info]
+                 :let               [ignition-probability (:ignition-probability (first spread-info))]
                  :when              (burnable-neighbors? fire-spread-matrix
                                                          fuel-model-matrix
                                                          num-rows
