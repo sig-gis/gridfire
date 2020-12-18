@@ -119,7 +119,8 @@
   (let [random-number (random-float 0 1 rand-gen)]
     (> spot-ignition-probability random-number)))
 
-(defn spot-ignition-time [])
+(defn spot-ignition-time [global-clock]
+  global-clock)
 
 ;;-----------------------------------------------------------------------------
 ;; Main
