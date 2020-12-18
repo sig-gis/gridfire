@@ -8,5 +8,5 @@
 
 (s/def ::spotting
   (common/one-or-more-keys [::ambient-gas-density
-                     ::specific-heat-gas
-                     ::num-firebrands]))
+                            ::specific-heat-gas
+                            ::num-firebrands]))

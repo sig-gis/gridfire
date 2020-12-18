@@ -200,7 +200,7 @@
   (testing "Running simulation with burned and unburned values different from Gridfire's definition"
     (let [postgis-config (merge test-config-base
                                 {:fetch-ignition-method :geotiff
-                                 :ignition-layer        {:path        (in-file-path "ign.tif")
+                                 :ignition-layer        {:path        (in-file-path "ign-inverted.tif")
                                                          :burn-values {:burned   -1.0
                                                                        :unburned 1.0}}})
           results        (run-simulation postgis-config)]
