@@ -297,22 +297,20 @@
         ignite-now    (or (:true to-ignite-now) {})]
     [ignite-later ignite-now]))
 
-(defn handle-spotting
+(defn update-spot-ignited-cells
   [constants global-clock temp-spot-cells spot-ignite-later fire-spread-matrix ignited-cells]
-  (let [spot-ignited-cells     (merge-with (partial min-key first) spot-ignite-later @temp-spot-cells)
+  (let [spot-ignited-cells (merge-with (partial min-key first) spot-ignite-later @temp-spot-cells)
         [spot-ignite-later
-         spot-ignite-now]      (identify-spot-ignition-events global-clock spot-ignite-later)
-        cells                  (keys spot-ignite-now)
-        ignition-probabilities (map (comp second val) spot-ignite-now)
-        spot-ignited-cells     (generate-ignited-cells constants
-                                                       fire-spread-matrix
-                                                       cells)
-        ignited-cells          (merge ignited-cells spot-ignited-cells)]
+         spot-ignite-now]  (identify-spot-ignition-events global-clock spot-ignite-later)
+        cells              (keys spot-ignite-now)
+        spot-ignited-cells (generate-ignited-cells constants
+                                                   fire-spread-matrix
+                                                   cells)
+        ignited-cells      (merge ignited-cells spot-ignited-cells)]
     (doseq [cell spot-ignite-now
-            :let [[i j]                    (key cell)
-                  [_ ignition-probability] (val cell)]]
-      (m/mset! fire-spread-matrix i j 1.0))
-    [spot-ignite-later ignited-cells]))
+            :let [[i j] (key cell)]
+            (m/mset! fire-spread-matrix i j 1.0))
+      [spot-ignite-later ignited-cells])))
 
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
@@ -359,12 +357,12 @@
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
             (m/mset! burn-time-matrix           i j global-clock)))
-        (let [[spot-ignite-later ignited-cells] (handle-spotting constants
-                                                                 global-clock
-                                                                 temp-spot-cells
-                                                                 spot-ignite-later
-                                                                 fire-spread-matrix
-                                                                 ignited-cells)]
+        (let [[spot-ignite-later ignited-cells] (update-spot-ignited-cells constants
+                                                                           global-clock
+                                                                           temp-spot-cells
+                                                                           spot-ignite-later
+                                                                           fire-spread-matrix
+                                                                           ignited-cells)]
           (recur next-global-clock
                  (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix global-clock)
                  spot-ignite-later)))
