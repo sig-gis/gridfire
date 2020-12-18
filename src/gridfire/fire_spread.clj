@@ -2,7 +2,8 @@
 (ns gridfire.fire-spread
   (:require [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as mop]
-            [gridfire.common :refer [fuel-moisture]]
+            [gridfire.common :refer [sample-at fuel-moisture in-bounds? burnable-fuel-model?
+                                     burnable?]]
             [gridfire.crown-fire :refer [crown-fire-eccentricity
                                          crown-fire-line-intensity
                                          cruz-crown-fire-spread
@@ -49,26 +50,6 @@
     (vector [i- j-] [i- j] [i- j+]
             [i  j-]        [i  j+]
             [i+ j-] [i+ j] [i+ j+])))
-
-(defn in-bounds?
-  "Returns true if the point lies within the bounds [0,rows) by [0,cols)."
-  [rows cols [i j]]
-  (and (>= i 0)
-       (>= j 0)
-       (< i rows)
-       (< j cols)))
-
-(defn burnable-fuel-model?
-  [^double number]
-  (and (pos? number)
-       (or (< number 91.0)
-           (> number 99.0))))
-
-(defn burnable?
-  "Returns true if cell [i j] has not yet been ignited (but could be)."
-  [fire-spread-matrix fuel-model-matrix [i j]]
-  (and (zero? (m/mget fire-spread-matrix i j))
-       (burnable-fuel-model? (m/mget fuel-model-matrix i j))))
 
 (defn distance-3d
   "Returns the terrain distance between two points in feet."
@@ -318,7 +299,7 @@
 
 (defn handle-spotting
   [constants global-clock temp-spot-cells spot-ignite-later fire-spread-matrix ignited-cells]
-  (let [spot-ignite-later      (merge-with (partial min-key first) spot-ignite-later @temp-spot-cells)
+  (let [spot-ignited-cells     (merge-with (partial min-key first) spot-ignite-later @temp-spot-cells)
         [spot-ignite-later
          spot-ignite-now]      (identify-spot-ignition-events global-clock spot-ignite-later)
         cells                  (keys spot-ignite-now)
