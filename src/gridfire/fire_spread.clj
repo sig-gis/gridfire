@@ -369,7 +369,6 @@
               (let [spot-ignitions (into {}
                                          (spot/spread-firebrands (merge constants {:global-clock global-clock})
                                                                  config
-                                                                 ignited-cells
                                                                  ignition-event
                                                                  firebrand-count-matrix
                                                                  fire-spread-matrix))]

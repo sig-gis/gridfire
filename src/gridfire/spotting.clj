@@ -181,6 +181,18 @@
           (partial map + cell-center))
          coord-deltas)))
 
+(defn update-firebrand-counts!
+  [{:keys [num-rows num-cols landfire-layers]}
+   fire-spread-matrix
+   firebrand-count-matrix
+   firebrands]
+  (doseq [[x y] firebrands
+          :when (and
+                 (in-bounds? num-rows num-cols [x y])
+                 (burnable? fire-spread-matrix (:fuel-model landfire-layers) [x y]))
+          :let  [new-count (inc (m/mget firebrand-count-matrix x y))]]
+    (m/mset! firebrand-count-matrix x y new-count)))
+
 (defn spread-firebrands
   "Returns a sequence of key value pairs where
   key: [x y] locations of the cell
@@ -190,46 +202,44 @@
      wind-from-direction temperature relative-humidity
      global-clock multiplier-lookup perturbations] :as constants}
    {:keys [spotting rand-gen] :as config}
-   ignited-cells
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
    firebrand-count-matrix
    fire-spread-matrix]
   (when crown-fire?
-    (let [ws     (sample-at cell
-                            global-clock
-                            wind-speed-20ft
-                            (:wind-speed-20ft multiplier-lookup)
-                            (:wind-speed-20ft perturbations))
-          tmp    (sample-at cell
-                            global-clock
-                            temperature
-                            (:temperature multiplier-lookup)
-                            (:temperature perturbations))
-          wd     (sample-at cell
-                            global-clock
-                            wind-from-direction
-                            (:wind-from-direction multiplier-lookup)
-                            (:wind-from-direction perturbations))
-          rh     (sample-at cell
-                            global-clock
-                            relative-humidity
-                            (:relative-humidity multiplier-lookup)
-                            (:relative-humidity perturbations))
-          deltas (sample-wind-dir-deltas constants spotting ws tmp cell)]
-      (-> (for [[x y] (firebrands deltas wd cell cell-size)
-                :when (and
-                       (in-bounds? num-rows num-cols [x y])
-                       (burnable? fire-spread-matrix (:fuel-model landfire-layers) [x y]))]
-            (let [new-count (inc (m/mget firebrand-count-matrix x y))
-                  p         (spot-ignition-probability constants
-                                                       spotting
-                                                       new-count
-                                                       cell
-                                                       [x y])]
-              (m/mset! firebrand-count-matrix x y new-count)
-              (when (and (spot-ignition? rand-gen p)
-                         (not (contains? [x y] ignited-cells)))
-                (let [t (spot-ignition-time global-clock)]
-                  [[x y] [t p]]))))
-          (remove nil?)))))
+    (let [ws         (sample-at cell
+                                global-clock
+                                wind-speed-20ft
+                                (:wind-speed-20ft multiplier-lookup)
+                                (:wind-speed-20ft perturbations))
+          tmp        (sample-at cell
+                                global-clock
+                                temperature
+                                (:temperature multiplier-lookup)
+                                (:temperature perturbations))
+          wd         (sample-at cell
+                                global-clock
+                                wind-from-direction
+                                (:wind-from-direction multiplier-lookup)
+                                (:wind-from-direction perturbations))
+          rh         (sample-at cell
+                                global-clock
+                                relative-humidity
+                                (:relative-humidity multiplier-lookup)
+                                (:relative-humidity perturbations))
+          deltas     (sample-wind-dir-deltas constants spotting ws tmp cell)
+          firebrands (firebrands deltas wd cell cell-size)]
+      (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix firebrands)
+      (->> (for [[x y] firebrands
+                 :let  [firebrand-count (m/mget firebrand-count-matrix x y)
+                        spot-ignition-p (spot-ignition-probability constants
+                                                                   spotting
+                                                                   firebrand-count
+                                                                   cell
+                                                                   [x y])]
+                 :when (and
+                        (in-bounds? num-rows num-cols [x y])
+                        (burnable? fire-spread-matrix (:fuel-model landfire-layers) [x y])
+                        (spot-ignition? rand-gen spot-ignition-p))]
+             [[x y] [(spot-ignition-time global-clock) spot-ignition-p]])
+           (remove nil?)))))
 ;; Spotting Model Forumulas:1 ends here
