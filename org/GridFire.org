@@ -344,10 +344,9 @@ First create the schema in our database.
 CREATE SCHEMA landfire;
 #+end_src
 
-Then we can use the following script to import landfire layers into our database given
-the schema and database as inputs.
+Then we can use the following script to import landfire layers into
+our database given the database name and schema as inputs.
 
-*Note:* This script needs to be run in the same folder as where these rasters reside.
 #+name: raster2pgsql-import-example-all
 #+begin_src sh :results silent :exports code :tangle ../resources/import_landfire_rasters.sh :padline no :no-expand :comments link
 #!/bin/sh
@@ -361,10 +360,13 @@ do
 done
 #+end_src
 
-To run the script give it our database and schema name.
-#+begin_src bash
+To run the script, give it our database name and schema.
+
+#+begin_src sh
 sh import_landfire_rasters.sh gridfire landfire
 #+end_src
+
+*Note:* This script needs to be run in the same folder as where these rasters reside.
 
 Whenever we want to add a new spatial reference system to our database, we can
 insert a record into our spatial_ref_sys table.
@@ -398,9 +400,7 @@ VALUES (900914, 'user-generated', 900914,
 *Note:* We must add any spatial reference systems used by the rasters
 we intend to import into the database *before* running raster2pgsql.
 
-If there is a need to update the srid of our layers we can use the following script.
-
-*Note:* This script needs to be run in the same folder as where these rasters reside.
+If there is a need to update the srid of our layers, we can use the following script.
 
 #+begin_src sh :results silent :exports code :tangle ../resources/update_landfire_srids.sh :padline no :no-expand :comments link
 #!/bin/sh
@@ -416,10 +416,13 @@ do
 done
 #+end_src
 
-To run the script, give it the database name, schema name and srid we wish the layers to have.
-#+begin_src bash
+To run the script, give it the database name, schema and srid we wish the layers to have.
+
+#+begin_src sh
 sh update_landfire_srids.sh gridfire landfire 900914
 #+end_src
+
+*Note:* This script needs to be run in the same folder as where these rasters reside.
 
 * Fire Spread Model
 
