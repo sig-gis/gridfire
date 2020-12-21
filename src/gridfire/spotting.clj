@@ -47,7 +47,7 @@
                       (F->K temperature)
                       (Math/sqrt g)))
                 (Math/pow (/ 2 3)))]
-    (/ wind-speed-20ft
+    (/ (* wind-speed-20ft 1.446) ;; miles/h -> m/s
        (Math/sqrt (* g L_c)))))
 
 (defn buoyancy-driven? [froude]
