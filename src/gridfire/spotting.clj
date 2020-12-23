@@ -1,7 +1,8 @@
 ;; [[file:../../org/GridFire.org::*Spotting Model Forumulas][Spotting Model Forumulas:1]]
 (ns gridfire.spotting
   (:require [clojure.core.matrix :as m]
-            [gridfire.common :refer [distance-3d
+            [gridfire.common :refer [extract-constants
+                                     distance-3d
                                      fuel-moisture
                                      in-bounds?]]
             [gridfire.conversion :as convert]
@@ -185,12 +186,16 @@
   [{:keys [num-rows num-cols landfire-layers]}
    fire-spread-matrix
    firebrand-count-matrix
+   [i j :as source]
    firebrands]
-  (doseq [[x y] firebrands
-          :when (and
-                 (in-bounds? num-rows num-cols [x y])
-                 (burnable? fire-spread-matrix (:fuel-model landfire-layers) [x y]))
-          :let  [new-count (inc (m/mget firebrand-count-matrix x y))]]
+  (doseq [[x y :as here] firebrands
+          :when          (and
+                          (in-bounds? num-rows num-cols [x y])
+                          (burnable? fire-spread-matrix
+                                     (:fuel-model landfire-layers)
+                                     source
+                                     here))
+          :let           [new-count (inc (m/mget firebrand-count-matrix x y))]]
     (m/mset! firebrand-count-matrix x y new-count)))
 
 (defn spread-firebrands
@@ -204,42 +209,35 @@
    {:keys [spotting rand-gen] :as config}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
    firebrand-count-matrix
-   fire-spread-matrix]
+   fire-spread-matrix
+   fire-line-intensity-matrix]
   (when crown-fire?
-    (let [ws         (sample-at cell
-                                global-clock
-                                wind-speed-20ft
-                                (:wind-speed-20ft multiplier-lookup)
-                                (:wind-speed-20ft perturbations))
-          tmp        (sample-at cell
-                                global-clock
-                                temperature
-                                (:temperature multiplier-lookup)
-                                (:temperature perturbations))
-          wd         (sample-at cell
-                                global-clock
-                                wind-from-direction
-                                (:wind-from-direction multiplier-lookup)
-                                (:wind-from-direction perturbations))
-          rh         (sample-at cell
-                                global-clock
-                                relative-humidity
-                                (:relative-humidity multiplier-lookup)
-                                (:relative-humidity perturbations))
-          deltas     (sample-wind-dir-deltas constants spotting ws tmp cell)
-          firebrands (firebrands deltas wd cell cell-size)]
-      (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix firebrands)
+    (let [{:keys
+           [wind-speed-20ft
+            temperature
+            wind-from-direction
+            relative-humidity]} (extract-constants constants global-clock cell)
+          deltas                (sample-wind-dir-deltas constants
+                                                        spotting
+                                                        fire-line-intensity-matrix
+                                                        (* wind-speed-20ft 0.447)
+                                                        temperature
+                                                        cell)
+          firebrands            (firebrands deltas wind-from-direction cell cell-size)]
+      (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix cell firebrands)
       (->> (for [[x y] firebrands
+                 :when (and
+                        (in-bounds? num-rows num-cols [x y])
+                        (burnable? fire-spread-matrix (:fuel-model landfire-layers) cell [x y]))
                  :let  [firebrand-count (m/mget firebrand-count-matrix x y)
                         spot-ignition-p (spot-ignition-probability constants
                                                                    spotting
+                                                                   temperature
+                                                                   relative-humidity
                                                                    firebrand-count
                                                                    cell
-                                                                   [x y])]
-                 :when (and
-                        (in-bounds? num-rows num-cols [x y])
-                        (burnable? fire-spread-matrix (:fuel-model landfire-layers) [x y])
-                        (spot-ignition? rand-gen spot-ignition-p))]
-             [[x y] [(spot-ignition-time global-clock) spot-ignition-p]])
+                                                                   [x y])]]
+             (when (spot-ignition? rand-gen spot-ignition-p)
+              [[x y] [(spot-ignition-time global-clock) spot-ignition-p]]))
            (remove nil?)))))
 ;; Spotting Model Forumulas:1 ends here

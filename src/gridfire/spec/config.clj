@@ -19,6 +19,7 @@
   (s/or :vector (s/coll-of int? :kind vector? :count 2)
         :list (s/coll-of int? :kind list?)
         :string string?
+        :scalar (or int? float?)
         :map #(s/valid? ::postgis-or-geotiff-map %)))
 
 (s/def ::temperature ::weather)

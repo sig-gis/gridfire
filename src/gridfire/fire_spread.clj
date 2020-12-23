@@ -2,7 +2,10 @@
 (ns gridfire.fire-spread
   (:require [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as mop]
-            [gridfire.common :refer [sample-at fuel-moisture in-bounds? burnable-fuel-model?
+            [gridfire.common :refer [extract-constants
+                                     fuel-moisture
+                                     in-bounds?
+                                     burnable-fuel-model?
                                      burnable?]]
             [gridfire.crown-fire :refer [crown-fire-eccentricity
                                          crown-fire-line-intensity
@@ -124,50 +127,6 @@
                                        overflow-heat
                                        0.0))
      :crown-fire?         crown-fire?}))
-
-(defn matrix-value-at [[i j] global-clock matrix]
-  (if (> (m/dimensionality matrix) 2)
-    (let [band (int (quot global-clock 60.0))] ;Assuming each band is 1 hour
-      (m/mget matrix band i j))
-    (m/mget matrix i j)))
-
-(defn sample-at
-  [here global-clock matrix multiplier perturb-info]
-  (let [cell       (if multiplier
-                     (map #(quot % multiplier) here)
-                     here)
-        value-here (matrix-value-at cell global-clock matrix)]
-    (if perturb-info
-      (if-let [freq (:frequency perturb-info)]
-        (+ value-here (perturbation/value-at perturb-info matrix cell (quot global-clock freq)))
-        (+ value-here (perturbation/value-at perturb-info matrix cell)))
-      value-here)))
-
-(def sample-at
-  (memoize sample-at))
-
-(defn extract-constants
-  [{:keys [landfire-layers wind-speed-20ft wind-from-direction temperature
-           relative-humidity foliar-moisture ellipse-adjustment-factor
-           multiplier-lookup perturbations]}
-   global-clock
-   [i j :as here]]
-  (let [layers (merge landfire-layers
-                      {:wind-speed-20ft     wind-speed-20ft
-                       :wind-from-direction wind-from-direction
-                       :temperature         temperature
-                       :relative-humidity   relative-humidity})]
-    (reduce-kv
-     (fn[acc name val]
-       (if (> (m/dimensionality val) 1)
-         (assoc acc name (sample-at here
-                                    global-clock
-                                    val
-                                    (name multiplier-lookup)
-                                    (name perturbations)))
-         (assoc acc name val)))
-     {}
-     layers)))
 
 (defn compute-neighborhood-fire-spread-rates!
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
