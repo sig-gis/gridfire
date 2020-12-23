@@ -47,7 +47,7 @@
                       (F->K temperature)
                       (Math/sqrt g)))
                 (Math/pow (/ 2 3)))]
-    (/ (* wind-speed-20ft 1.446) ;; miles/h -> m/s
+    (/ wind-speed-20ft
        (Math/sqrt (* g L_c)))))
 
 (defn buoyancy-driven? [froude]
@@ -73,8 +73,8 @@
       (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
          (* 2 (Math/pow deviation 2))))))
 
-(defn specific-heat-dry-fuel [t]
-  (+ 0.266 0.0016 (/ (+ 320 t) 2)))
+(defn specific-heat-dry-fuel [initial-temp ignition-temp]
+  (+ 0.266 0.0016 (/ (+ ignition-temp initial-temp) 2)))
 
 (defn heat-of-preignition
   [init-temperature ignition-temperature moisture]
@@ -99,38 +99,30 @@
 (defn schroeder-ignition-probability [fuel-model-number relative-humidity temperature]
   (let [ignition-temperature 320 ;;TODO should this be a constant?
         fuel-moisture        (fuel-moisture relative-humidity temperature)
-        moisture             (->> (build-fuel-model (int (fuel-model-number)))
-                                  (moisturize fuel-moisture)
-                                  :M_f
-                                  size-class-sum
-                                  category-sum)
-        Q_ig                 (heat-of-preignition temperature ignition-temperature moisture)
+        moisture-model       (as-> (int fuel-model-number) $
+                                     (build-fuel-model $)
+                                     (moisturize $ fuel-moisture)
+                                     (:M_f $))
+        m                    (size-class-sum (fn [i j] (-> moisture-model i j)))
+        total-moisture       (category-sum (fn [i] (-> m i)))
+        Q_ig                 (heat-of-preignition temperature ignition-temperature total-moisture)
         X                    (/ (- 400 Q_ig) 10)]
     (/ (* 0.000048 (Math/pow X 4.3)) 50)))
 
 (defn spot-ignition-probability
   [{:keys
-    [cell-size global-clock landfire-layers relative-humidity temperature
+    [cell-size global-clock landfire-layers
      multiplier-lookup perturbations]}
    {:keys [decay-constant] :as spot-config}
-   firebrand-count-matrix
+   temperature
+   relative-humidity
+   firebrand-count
    torched-origin
    [i j :as here]]
   (let [fuel-model-number (m/mget (:fuel-model landfire-layers) i j)
-        temperature       (sample-at here
-                                     global-clock
-                                     temperature
-                                     (:temperature multiplier-lookup)
-                                     (:temperature perturbations))
-        relative-hu-idity (sample-at here
-                                     global-clock
-                                     relative-humidity
-                                     (:relative-humidity multiplier-lookup)
-                                     (:relative-humidity perturbations))
         p                 (schroeder-ignition-probability fuel-model-number relative-humidity temperature)
         distance          (distance-3d (:elevation landfire-layers) cell-size here torched-origin)
-        decay-factor      (Math/exp (* decay-constant distance))
-        firebrand-count   (m/mget firebrand-count-matrix i j)]
+        decay-factor      (Math/exp (* decay-constant distance))]
     (- 1 (Math/pow (- 1 (* p decay-factor)) firebrand-count))))
 
 ;;-----------------------------------------------------------------------------
@@ -145,14 +137,17 @@
   "
   [{:keys [fire-line-intensity] :as constants}
    {:keys [num-firebrands ambient-gas-density specific-heat-gas]}
-   wind-speed-20ft temperature i j]
-  (let [intensity     (m/mget fire-line-intensity i j)
+   fire-line-intensity-matrix
+   wind-speed-20ft temperature [i j]]
+  (let [intensity     (m/mget fire-line-intensity-matrix i j)
         froude        (froude-number intensity wind-speed-20ft temperature ambient-gas-density specific-heat-gas)
         mean          (mean-fb froude intensity wind-speed-20ft)
         deviation     (deviation-fb froude intensity wind-speed-20ft)
         parallel      (distribution/log-normal {:mu mean :sd deviation})
         perpendicular (distribution/normal {:mu 0 :sd 0.92})]
-    (map vector
+    (map (comp
+          (partial mapv m->ft)
+          vector)
          (distribution/sample num-firebrands parallel)
          (distribution/sample num-firebrands perpendicular))))
 
@@ -169,7 +164,7 @@
                t2 (rad->deg (Math/atan (/ d-perp d-paral)))
                t3 (+ t1 t2)]
            [(* H (Math/sin (deg->rad t3)))
-            (* H (Math/cos (deg->rad t3)))]))
+            (* -1 H (Math/cos (deg->rad t3)))]))
        deltas))
 
 (defn firebrands
@@ -180,7 +175,7 @@
         coord-deltas (deltas-wind->coord deltas wind-direction)]
     (map (comp
           (partial map int)
-          (partial map #(quot step %))
+          (partial map #(quot % step))
           (partial map + cell-center))
          coord-deltas)))
 
