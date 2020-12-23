@@ -303,19 +303,20 @@
         ;;   :flame-length :fire-line-intensity} ...]
         (doseq [{:keys [cell flame-length fire-line-intensity crown-fire?] :as ignition-event} ignition-events]
           (let [[i j] cell]
+            (m/mset! fire-spread-matrix         i j 1.0)
+            (m/mset! flame-length-matrix        i j flame-length)
+            (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
+            (m/mset! burn-time-matrix           i j global-clock)
             (when spotting
               (let [spot-ignitions (into {}
                                          (spot/spread-firebrands (merge constants {:global-clock global-clock})
                                                                  config
                                                                  ignition-event
                                                                  firebrand-count-matrix
-                                                                 fire-spread-matrix))]
+                                                                 fire-spread-matrix
+                                                                 fire-line-intensity-matrix))]
                 (vreset! temp-spot-cells (merge-with (partial min-key first)
-                                                     @temp-spot-cells spot-ignitions))))
-            (m/mset! fire-spread-matrix         i j 1.0)
-            (m/mset! flame-length-matrix        i j flame-length)
-            (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
-            (m/mset! burn-time-matrix           i j global-clock)))
+                                                     @temp-spot-cells spot-ignitions))))))
         (let [[spot-ignite-later ignited-cells] (update-spot-ignited-cells constants
                                                                            global-clock
                                                                            temp-spot-cells

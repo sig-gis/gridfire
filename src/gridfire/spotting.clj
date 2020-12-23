@@ -220,8 +220,8 @@
           deltas                (sample-wind-dir-deltas constants
                                                         spotting
                                                         fire-line-intensity-matrix
-                                                        (* wind-speed-20ft 0.447)
-                                                        temperature
+                                                        (convert/mph->mps wind-speed-20ft)
+                                                        (F->K temperature)
                                                         cell)
           firebrands            (firebrands deltas wind-from-direction cell cell-size)]
       (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix cell firebrands)
@@ -238,6 +238,6 @@
                                                                    cell
                                                                    [x y])]]
              (when (spot-ignition? rand-gen spot-ignition-p)
-              [[x y] [(spot-ignition-time global-clock) spot-ignition-p]]))
+               [[x y] [(spot-ignition-time global-clock) spot-ignition-p]]))
            (remove nil?)))))
 ;; Spotting Model Forumulas:1 ends here
