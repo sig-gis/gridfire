@@ -2267,9 +2267,13 @@ algorithm.
 #+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
 (ns gridfire.spotting
   (:require [clojure.core.matrix :as m]
-            [gridfire.common :refer [distance-3d
+            [gridfire.common :refer [extract-constants
+                                     distance-3d
                                      fuel-moisture
-                                     in-bounds?]]
+                                     in-bounds?
+                                     burnable?]]
+            [gridfire.crown-fire :refer [Btu-ft-s->kW-m]]
+            [gridfire.utils.random :refer [random-float]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
 
@@ -2380,6 +2384,14 @@ algorithm.
         decay-factor         (Math/exp (* -1 decay-constant distance))]
     (- 1 (Math/pow (- 1 (* ignition-probability decay-factor)) firebrand-count))))
 
+(defn spot-ignition?
+  [rand-gen spot-ignition-probability]
+  (let [random-number (random-float 0 1 rand-gen)]
+    (> spot-ignition-probability random-number)))
+
+(defn spot-ignition-time [global-clock]
+  global-clock)
+
 ;;-----------------------------------------------------------------------------
 ;; Main
 ;;-----------------------------------------------------------------------------
@@ -2439,22 +2451,64 @@ algorithm.
           (partial map + cell-center))
          coord-deltas)))
 
+(defn update-firebrand-counts!
+  [{:keys [num-rows num-cols landfire-layers]}
+   firebrand-count-matrix
+   fire-spread-matrix
+   [i j :as source]
+   firebrands]
+  (doseq [[x y :as here] firebrands
+          :when          (and
+                          (in-bounds? num-rows num-cols [x y])
+                          (burnable? fire-spread-matrix
+                                     (:fuel-model landfire-layers)
+                                     source
+                                     here))
+          :let           [new-count (inc (m/mget firebrand-count-matrix x y))]]
+    (m/mset! firebrand-count-matrix x y new-count)))
+
 (defn spread-firebrands
-  [{:keys [num-rows num-cols cell-size wind-speed-20ft wind-from-direction temperature] :as constants}
-   {:keys [num-firebrands] :as spot-config}
+  "Returns a sequence of key value pairs where
+  key: [x y] locations of the cell
+  val: [t p] where t = time of ignition and p = ignition-probability"
+  [{:keys
+    [num-rows num-cols cell-size landfire-layers wind-speed-20ft
+     wind-from-direction temperature relative-humidity
+     global-clock multiplier-lookup perturbations] :as constants}
+   {:keys [spotting rand-gen] :as config}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
    firebrand-count-matrix
-   fire-spread-matrix]
+   fire-spread-matrix
+   fire-line-intensity-matrix]
   (when crown-fire?
-    (let [deltas (sample-wind-dir-deltas constants
-                                         spot-config
-                                         (convert/mph->mps (wind-speed-20ft))
-                                         (convert/F->K temperature)
-                                         cell)]
-      (doseq [[x y] (firebrands deltas wind-from-direction cell cell-size)
-              :when (in-bounds? num-rows num-cols [x y])]
-        (let [count (m/mget firebrand-count-matrix x y)]
-          (m/mset! firebrand-count-matrix x y (inc count)))))))
+    (let [{:keys
+           [wind-speed-20ft
+            temperature
+            wind-from-direction
+            relative-humidity]} (extract-constants constants global-clock cell)
+          deltas                (sample-wind-dir-deltas constants
+                                                        spotting
+                                                        fire-line-intensity-matrix
+                                                        (convert/mph->mps wind-speed-20ft)
+                                                        (F->K temperature)
+                                                        cell)
+          firebrands            (firebrands deltas (mod (+ 180 wind-from-direction) 360) cell cell-size)]
+      (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix cell firebrands)
+      (->> (for [[x y] firebrands
+                 :when (and
+                        (in-bounds? num-rows num-cols [x y])
+                        (burnable? fire-spread-matrix (:fuel-model landfire-layers) cell [x y]))
+                 :let  [firebrand-count (m/mget firebrand-count-matrix x y)
+                        spot-ignition-p (spot-ignition-probability constants
+                                                                   spotting
+                                                                   temperature
+                                                                   relative-humidity
+                                                                   firebrand-count
+                                                                   cell
+                                                                   [x y])]]
+             (when (spot-ignition? rand-gen spot-ignition-p)
+               [[x y] [(spot-ignition-time global-clock) spot-ignition-p]]))
+           (remove nil?)))))
 #+end_src
 * User Interface
 

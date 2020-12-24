@@ -4,7 +4,10 @@
             [gridfire.common :refer [extract-constants
                                      distance-3d
                                      fuel-moisture
-                                     in-bounds?]]
+                                     in-bounds?
+                                     burnable?]]
+            [gridfire.crown-fire :refer [Btu-ft-s->kW-m]]
+            [gridfire.utils.random :refer [random-float]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
 
@@ -184,8 +187,8 @@
 
 (defn update-firebrand-counts!
   [{:keys [num-rows num-cols landfire-layers]}
-   fire-spread-matrix
    firebrand-count-matrix
+   fire-spread-matrix
    [i j :as source]
    firebrands]
   (doseq [[x y :as here] firebrands
@@ -223,7 +226,7 @@
                                                         (convert/mph->mps wind-speed-20ft)
                                                         (F->K temperature)
                                                         cell)
-          firebrands            (firebrands deltas wind-from-direction cell cell-size)]
+          firebrands            (firebrands deltas (mod (+ 180 wind-from-direction) 360) cell cell-size)]
       (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix cell firebrands)
       (->> (for [[x y] firebrands
                  :when (and

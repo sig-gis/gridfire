@@ -257,10 +257,16 @@
     [ignite-later ignite-now]))
 
 (defn update-spot-ignited-cells
-  [constants global-clock temp-spot-cells spot-ignite-later fire-spread-matrix ignited-cells]
+  [constants
+   global-clock
+   temp-spot-cells
+   spot-ignite-later
+   fire-spread-matrix
+   burn-time-matrix
+   ignited-cells]
   (let [spot-ignited-cells (merge-with (partial min-key first) spot-ignite-later @temp-spot-cells)
         [spot-ignite-later
-         spot-ignite-now]  (identify-spot-ignition-events global-clock spot-ignite-later)
+         spot-ignite-now]  (identify-spot-ignition-events global-clock spot-ignited-cells)
         cells              (keys spot-ignite-now)
         spot-ignited-cells (generate-ignited-cells constants
                                                    fire-spread-matrix
@@ -268,7 +274,8 @@
         ignited-cells      (merge ignited-cells spot-ignited-cells)]
     (doseq [cell spot-ignite-now
             :let [[i j] (key cell)]
-            (m/mset! fire-spread-matrix i j 1.0))
+            (m/mset! fire-spread-matrix i j 1.0)
+            (m/mset! burn-time-matrix i j global-clock))
       [spot-ignite-later ignited-cells])))
 
 (defn run-loop
