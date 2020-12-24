@@ -100,7 +100,7 @@
     (+ Q_a Q_b Q_c Q_d)))
 
 (defn schroeder-ignition-probability [fuel-model-number relative-humidity temperature]
-  (let [ignition-temperature 320 ;;TODO should this be a constant?
+  (let [ignition-temperature 320 ;;FIXME should this be a constant?
         fuel-moisture        (fuel-moisture relative-humidity temperature)
         moisture-model       (as-> (int fuel-model-number) $
                                      (build-fuel-model $)
@@ -122,11 +122,16 @@
    firebrand-count
    torched-origin
    [i j :as here]]
-  (let [fuel-model-number (m/mget (:fuel-model landfire-layers) i j)
-        p                 (schroeder-ignition-probability fuel-model-number relative-humidity temperature)
-        distance          (distance-3d (:elevation landfire-layers) cell-size here torched-origin)
-        decay-factor      (Math/exp (* decay-constant distance))]
-    (- 1 (Math/pow (- 1 (* p decay-factor)) firebrand-count))))
+  (let [fuel-model-number    (m/mget (:fuel-model landfire-layers) i j)
+        ignition-probability (schroeder-ignition-probability fuel-model-number
+                                                             relative-humidity
+                                                             temperature)
+        distance             (distance-3d (:elevation landfire-layers)
+                                          cell-size
+                                          here
+                                          torched-origin)
+        decay-factor         (Math/exp (* decay-constant distance))]
+    (- 1 (Math/pow (- 1 (* ignition-probability decay-factor)) firebrand-count))))
 
 ;;-----------------------------------------------------------------------------
 ;; Main
@@ -141,9 +146,15 @@
   [{:keys [fire-line-intensity] :as constants}
    {:keys [num-firebrands ambient-gas-density specific-heat-gas]}
    fire-line-intensity-matrix
-   wind-speed-20ft temperature [i j]]
+   wind-speed-20ft
+   temperature
+   [i j]]
   (let [intensity     (m/mget fire-line-intensity-matrix i j)
-        froude        (froude-number intensity wind-speed-20ft temperature ambient-gas-density specific-heat-gas)
+        froude        (froude-number intensity
+                                     wind-speed-20ft
+                                     temperature
+                                     ambient-gas-density
+                                     specific-heat-gas)
         mean          (mean-fb froude intensity wind-speed-20ft)
         deviation     (deviation-fb froude intensity wind-speed-20ft)
         parallel      (distribution/log-normal {:mu mean :sd deviation})
