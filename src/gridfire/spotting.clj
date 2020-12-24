@@ -226,7 +226,8 @@
                                                         (convert/mph->mps wind-speed-20ft)
                                                         (F->K temperature)
                                                         cell)
-          firebrands            (firebrands deltas (mod (+ 180 wind-from-direction) 360) cell cell-size)]
+          wind-direction        (mod (+ 180 wind-from-direction) 360)
+          firebrands            (firebrands deltas wind-direction cell cell-size)]
       (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix cell firebrands)
       (->> (for [[x y] firebrands
                  :when (and
