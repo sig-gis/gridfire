@@ -205,10 +205,10 @@
                      fire-line-intensity
                      fractional-distance
                      crown-fire?]} destinations]
-         (let [[i j]                source
-               new-spread-fraction  (/ (* spread-rate timestep) terrain-distance)
-               new-total            (vreset! fractional-distance
-                                             (+ @fractional-distance new-spread-fraction))]
+         (let [[i j]               source
+               new-spread-fraction (/ (* spread-rate timestep) terrain-distance)
+               new-total           (vreset! fractional-distance
+                                            (+ @fractional-distance new-spread-fraction))]
            (if (>= new-total 1.0)
              {:cell                 cell
               :trajectory           trajectory
