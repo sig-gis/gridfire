@@ -223,8 +223,8 @@
             temperature
             wind-from-direction
             relative-humidity]} (extract-constants constants global-clock cell)
-          temperature           (F->K temperature)
-          wind-speed-20ft       (mph->mps wind-speed-20ft)
+          temp-K                (F->K temperature)
+          wind-speed-mps        (mph->mps wind-speed-20ft)
           deltas                (sample-wind-dir-deltas config
                                                         fire-line-intensity-matrix
                                                         (convert/mph->mps wind-speed-20ft)
@@ -239,7 +239,7 @@
                  :let  [firebrand-count (m/mget firebrand-count-matrix x y)
                         spot-ignition-p (spot-ignition-probability constants
                                                                    spotting
-                                                                   temperature
+                                                                   temp-K
                                                                    relative-humidity
                                                                    firebrand-count
                                                                    cell
