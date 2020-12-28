@@ -289,8 +289,7 @@
    burn-time-matrix]
   (loop [global-clock      0.0
          ignited-cells     ignited-cells
-         spot-ignite-later {} ;;priority-queue {[x y] [time ignition-probability]}
-         ]
+         spot-ignite-later {}]
     (if (and (< global-clock max-runtime)
              (seq ignited-cells))
       (let [dt                (->> ignited-cells
