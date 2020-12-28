@@ -27,7 +27,7 @@
         L_c (-> (/ fire-line-intensity ;characteristic length of plume
                    (* ambient-gas-density
                       specific-heat-gas
-                      (convert/F->K temperature)
+                      temperature
                       (Math/sqrt g)))
                 (Math/pow (/ 2 3)))]
     (/ wind-speed-20ft
