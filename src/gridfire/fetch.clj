@@ -9,9 +9,9 @@
 
 (defn convert-burn-values [matrix {:keys [burned unburned]}]
   (m/emap #(condp = %
-            (double burned)   1.0
-            (double unburned) 0.0
-            -1.0)
+             (double burned)   1.0
+             (double unburned) 0.0
+             -1.0)
           matrix))
 
 (defmulti initial-ignition-layers
