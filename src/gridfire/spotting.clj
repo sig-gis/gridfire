@@ -68,7 +68,7 @@
     (+ (* 1.47 (Math/pow fire-line-intensity 0.54) (Math/pow wind-speed-20ft -0.55)) 1.14)
     (- (* 1.32 (Math/pow fire-line-intensity 0.26) (Math/pow wind-speed-20ft 0.11)) 0.02)))
 
-(defn sardoy-probability
+#_(defn sardoy-probability ;;FIXME Not used?
   [distance mean deviation]
   (* (/ 1
         (* (Math/sqrt (* 2 Math/PI)) deviation distance))
