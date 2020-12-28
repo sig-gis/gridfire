@@ -151,10 +151,10 @@
                                              temperature
                                              ambient-gas-density
                                              specific-heat-gas)
-        mean                  (mean-fb froude intensity wind-speed-20ft)
-        deviation             (deviation-fb froude intensity wind-speed-20ft)
-        parallel              (distribution/log-normal {:mu mean :sd deviation})
-        perpendicular         (distribution/normal {:mu 0 :sd 0.92})]
+        parallel              (distribution/log-normal {:mu (mean-fb froude intensity wind-speed-20ft)
+                                                        :sd (deviation-fb froude intensity wind-speed-20ft)})
+        perpendicular         (distribution/normal {:mu 0
+                                                    :sd 0.92})]
     (map (comp
           (partial mapv convert/m->ft)
           vector)
