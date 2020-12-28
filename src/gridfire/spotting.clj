@@ -134,27 +134,32 @@
   "Returns a sequence of [x y] distances (meters) that firebrands land away
   from a torched cell at i j where:
   x: parallel to the wind
-  y: perpendicular to the wind (positive values are to the right of wind direction)"
-  [{:keys [num-firebrands ambient-gas-density specific-heat-gas]}
+  y: perpendicular to the wind (positive values are to the right of wind direction)
+  "
+  [{:keys [spotting random-seed] :as config}
    fire-line-intensity-matrix
    wind-speed-20ft
    temperature
    [i j]]
-  (let [intensity     (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
-        froude        (froude-number intensity
-                                     wind-speed-20ft
-                                     temperature
-                                     ambient-gas-density
-                                     specific-heat-gas)
-        mean          (mean-fb froude intensity wind-speed-20ft)
-        deviation     (deviation-fb froude intensity wind-speed-20ft)
-        parallel      (distribution/log-normal {:mu mean :sd deviation})
-        perpendicular (distribution/normal {:mu 0 :sd 0.92})]
+  (let [{:keys
+         [num-firebrands
+          ambient-gas-density
+          specific-heat-gas]} spotting
+        intensity             (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
+        froude                (froude-number intensity
+                                             wind-speed-20ft
+                                             temperature
+                                             ambient-gas-density
+                                             specific-heat-gas)
+        mean                  (mean-fb froude intensity wind-speed-20ft)
+        deviation             (deviation-fb froude intensity wind-speed-20ft)
+        parallel              (distribution/log-normal {:mu mean :sd deviation})
+        perpendicular         (distribution/normal {:mu 0 :sd 0.92})]
     (map (comp
           (partial mapv convert/m->ft)
           vector)
-         (distribution/sample num-firebrands parallel)
-         (distribution/sample num-firebrands perpendicular))))
+         (distribution/sample num-firebrands parallel {:seed random-seed})
+         (distribution/sample num-firebrands perpendicular {:seed random-seed}))))
 
 (defn hypotenuse [x y]
   (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
@@ -207,7 +212,7 @@
     [num-rows num-cols cell-size landfire-layers wind-speed-20ft
      wind-from-direction temperature relative-humidity
      global-clock multiplier-lookup perturbations] :as constants}
-   {:keys [spotting rand-gen] :as config}
+   {:keys [spotting rand-gen random-seed] :as config}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
    firebrand-count-matrix
    fire-spread-matrix
@@ -218,7 +223,9 @@
             temperature
             wind-from-direction
             relative-humidity]} (extract-constants constants global-clock cell)
-          deltas                (sample-wind-dir-deltas spotting
+          temperature           (F->K temperature)
+          wind-speed-20ft       (mph->mps wind-speed-20ft)
+          deltas                (sample-wind-dir-deltas config
                                                         fire-line-intensity-matrix
                                                         (convert/mph->mps wind-speed-20ft)
                                                         (F->K temperature)
