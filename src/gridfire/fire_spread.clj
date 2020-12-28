@@ -276,7 +276,7 @@
             :let [[i j] (key cell)]]
       (m/mset! fire-spread-matrix i j 1.0)
       (m/mset! burn-time-matrix i j global-clock))
-    [spot-ignite-later ignited-cells])))
+    [spot-ignite-later ignited-cells]))
 
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
