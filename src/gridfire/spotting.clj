@@ -19,7 +19,13 @@
   "convert farenheight to kelvin"
   [degrees]
   (->> (+ degrees 459.67)
-       (* (/ 5 9))))
+       (* (/ 5.0 9.0))))
+
+(defn F->C
+  "convert farenheight to celcius"
+  [degrees]
+  (->> (- degrees 32.0)
+       (* (/ 5.0 9.0))))
 
 (defn deg->rad [d]
   (* d (/ Math/PI 180)))
@@ -69,15 +75,15 @@
     (- (* 1.32 (Math/pow fire-line-intensity 0.26) (Math/pow wind-speed-20ft 0.11)) 0.02)))
 
 #_(defn sardoy-probability ;;FIXME Not used?
-  [distance mean deviation]
-  (* (/ 1
-        (* (Math/sqrt (* 2 Math/PI)) deviation distance))
-     (Math/exp
-      (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
-         (* 2 (Math/pow deviation 2))))))
+    [distance mean deviation]
+    (* (/ 1
+          (* (Math/sqrt (* 2 Math/PI)) deviation distance))
+       (Math/exp
+        (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
+           (* 2 (Math/pow deviation 2))))))
 
 (defn specific-heat-dry-fuel [initial-temp ignition-temp]
-  (+ 0.266 0.0016 (/ (+ ignition-temp initial-temp) 2)))
+  (+ 0.266 (* 0.0016 (/ (+ ignition-temp initial-temp) 2))))
 
 (defn heat-of-preignition
   [init-temperature ignition-temperature moisture]
@@ -103,12 +109,12 @@
   (let [ignition-temperature 320 ;;FIXME should this be a constant?
         fuel-moisture        (fuel-moisture relative-humidity temperature)
         moisture-model       (as-> (int fuel-model-number) $
-                                     (build-fuel-model $)
-                                     (moisturize $ fuel-moisture)
-                                     (:M_f $))
+                               (build-fuel-model $)
+                               (moisturize $ fuel-moisture)
+                               (:M_f $))
         m                    (size-class-sum (fn [i j] (-> moisture-model i j)))
         total-moisture       (category-sum (fn [i] (-> m i)))
-        Q_ig                 (heat-of-preignition temperature ignition-temperature total-moisture)
+        Q_ig                 (heat-of-preignition (F->C temperature) ignition-temperature total-moisture)
         X                    (/ (- 400 Q_ig) 10)]
     (/ (* 0.000048 (Math/pow X 4.3)) 50)))
 
