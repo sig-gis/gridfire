@@ -6,7 +6,7 @@
                                      fuel-moisture
                                      in-bounds?
                                      burnable?]]
-            [gridfire.crown-fire :refer [Btu-ft-s->kW-m]]
+            [gridfire.crown-fire :refer [Btu-ft-s->kW-m ft->m]]
             [gridfire.utils.random :refer [random-float]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
@@ -111,11 +111,11 @@
    [i j :as here]]
   (let [ignition-probability (schroeder-ign-prob relative-humidity
                                                  temperature)
-        distance             (distance-3d (:elevation landfire-layers)
-                                          cell-size
-                                          here
-                                          torched-origin)
-        decay-factor         (Math/exp (* -1 decay-constant distance))]
+        distance             (ft->m (distance-3d (:elevation landfire-layers)
+                                                 cell-size
+                                                 here
+                                                 torched-origin))
+        decay-factor         (Math/exp (* - 1 decay-constant distance))]
     (- 1 (Math/pow (- 1 (* ignition-probability decay-factor)) firebrand-count))))
 
 (defn spot-ignition?
