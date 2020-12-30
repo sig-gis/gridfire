@@ -78,7 +78,7 @@
   "Returns heat of preignition given:
   init-temperature: (Celcius)
   ignition-temperature: (Celcius)
-  moisture content: (percent)"
+  moisture content: (Percent)"
   [init-temperature ignition-temperature moisture]
   (let [T_o init-temperature
         T_i ignition-temperature
