@@ -26,3 +26,13 @@
   "Convert meters to feet."
   [m]
   (* m 3.281))
+
+(defn mph->mps
+  "Convert miles per hour to meters per second."
+  [s]
+  (* s 0.447))
+
+(defn Btu-ft-s->kW-m
+  "Convert BTU per feet per second to kilowatt per meter."
+  [Btu-ft-s]
+  (/ Btu-ft-s 0.288894658272))
