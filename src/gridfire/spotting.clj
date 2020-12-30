@@ -223,8 +223,6 @@
             temperature
             wind-from-direction
             relative-humidity]} (extract-constants constants global-clock cell)
-          temp-K                (F->K temperature)
-          wind-speed-mps        (mph->mps wind-speed-20ft)
           deltas                (sample-wind-dir-deltas config
                                                         fire-line-intensity-matrix
                                                         (convert/mph->mps wind-speed-20ft)
