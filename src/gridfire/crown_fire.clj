@@ -5,8 +5,6 @@
 
 (defn kW-m->Btu-ft-s [kW-m] (* 0.288894658272 kW-m))
 
-(defn Btu-ft-s->kW-m [Btu-ft-s] (/ Btu-ft-s 0.288894658272))
-
 (defn van-wagner-crown-fire-initiation?
   "- canopy-cover (0-100 %)
    - canopy-base-height (ft)

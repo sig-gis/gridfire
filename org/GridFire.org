@@ -1382,8 +1382,6 @@ crown fire initiation occurs.
 
 (defn kW-m->Btu-ft-s [kW-m] (* 0.288894658272 kW-m))
 
-(defn Btu-ft-s->kW-m [Btu-ft-s] (/ Btu-ft-s 0.288894658272))
-
 (defn van-wagner-crown-fire-initiation?
   "- canopy-cover (0-100 %)
    - canopy-base-height (ft)
@@ -2233,7 +2231,7 @@ algorithm.
                                      fuel-moisture
                                      in-bounds?
                                      burnable?]]
-            [gridfire.crown-fire :refer [Btu-ft-s->kW-m ft->m]]
+            [gridfire.crown-fire :refer [ft->m]]
             [gridfire.utils.random :refer [random-float]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))

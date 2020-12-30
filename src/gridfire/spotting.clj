@@ -6,7 +6,7 @@
                                      fuel-moisture
                                      in-bounds?
                                      burnable?]]
-            [gridfire.crown-fire :refer [Btu-ft-s->kW-m ft->m]]
+            [gridfire.crown-fire :refer [ft->m]]
             [gridfire.utils.random :refer [random-float]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
