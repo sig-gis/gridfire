@@ -12,11 +12,17 @@
   (->> (- degrees 32.0)
        (* (/ 5.0 9.0))))
 
-(defn deg->rad [d]
+(defn deg->rad
+  "Convert degrees to radians"
+  [d]
   (* d (/ Math/PI 180)))
 
-(defn rad->deg [d]
+(defn rad->deg
+  "Convert radians to degrees"
+  [d]
   (* d (/ 180 Math/PI)))
 
-(defn m->ft [m]
+(defn m->ft
+  "Convert meters to feet"
+  [m]
   (* m 3.281))
