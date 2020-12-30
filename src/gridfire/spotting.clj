@@ -237,7 +237,7 @@
                  :let  [firebrand-count (m/mget firebrand-count-matrix x y)
                         spot-ignition-p (spot-ignition-probability constants
                                                                    spotting
-                                                                   temp-K
+                                                                   temperature
                                                                    relative-humidity
                                                                    firebrand-count
                                                                    cell
