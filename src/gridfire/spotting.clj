@@ -183,8 +183,8 @@
                t1 wind-direction
                t2 (rad->deg (Math/atan (/ d-perp d-paral)))
                t3 (+ t1 t2)]
-           [(* H (Math/sin (deg->rad t3)))
-            (* -1 H (Math/cos (deg->rad t3)))]))
+           [(* -1 H (Math/cos (deg->rad t3)))
+            (* H (Math/sin (deg->rad t3)))]))
        deltas))
 
 (defn firebrands
