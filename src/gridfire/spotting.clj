@@ -226,7 +226,7 @@
           deltas                (sample-wind-dir-deltas config
                                                         fire-line-intensity-matrix
                                                         (convert/mph->mps wind-speed-20ft)
-                                                        (F->K temperature)
+                                                        (convert/F->K temperature)
                                                         cell)
           wind-to-direction     (mod (+ 180 wind-from-direction) 360)
           firebrands            (firebrands deltas wind-to-direction cell cell-size)]
