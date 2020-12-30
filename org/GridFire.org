@@ -2406,10 +2406,10 @@ algorithm.
 
 (defn firebrands
   "Returns a sequence of cells that firebrands land in"
-  [deltas wind-direction cell cell-size]
+  [deltas wind-to-direction cell cell-size]
   (let [step         (/ cell-size 2)
         cell-center  (mapv #(+ step (* % step)) cell)
-        coord-deltas (deltas-wind->coord deltas wind-direction)]
+        coord-deltas (deltas-wind->coord deltas wind-to-direction)]
     (map (comp
           (partial map int)
           (partial map #(quot % step))
@@ -2455,8 +2455,8 @@ algorithm.
                                                         (convert/mph->mps wind-speed-20ft)
                                                         (F->K temperature)
                                                         cell)
-          wind-direction        (mod (+ 180 wind-from-direction) 360)
-          firebrands            (firebrands deltas wind-direction cell cell-size)]
+          wind-to-direction     (mod (+ 180 wind-from-direction) 360)
+          firebrands            (firebrands deltas wind-to-direction cell cell-size)]
       (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix cell firebrands)
       (->> (for [[x y] firebrands
                  :when (and (in-bounds? num-rows num-cols [x y])
