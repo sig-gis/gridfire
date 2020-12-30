@@ -166,7 +166,7 @@
 
 (defn deltas-wind->coord
   "Converts deltas from the torched tree in the wind direction to deltas
-  in the coordinate plane"
+  in the coordinate plane "
   [deltas wind-direction]
   (map (fn [[d-paral d-perp]]
          (let [H  (hypotenuse d-paral d-perp)
@@ -179,7 +179,7 @@
 
 (defn firebrands
   "Returns a sequence of cells that firebrands land in"
-  [[x y :as deltas] wind-direction cell cell-size]
+  [deltas wind-direction cell cell-size]
   (let [step         (/ cell-size 2)
         cell-center  (mapv #(+ step (* % step)) cell)
         coord-deltas (deltas-wind->coord deltas wind-direction)]
