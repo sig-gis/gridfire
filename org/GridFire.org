@@ -2254,51 +2254,27 @@ algorithm.
                                           moisturize
                                           size-class-sum
                                           category-sum]]
+            [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
-
-;;-----------------------------------------------------------------------------
-;; Utils
-;;-----------------------------------------------------------------------------
-
-(defn F->K
-  "convert farenheight to kelvin"
-  [degrees]
-  (->> (+ degrees 459.67)
-       (* (/ 5.0 9.0))))
-
-(defn F->C
-  "convert farenheight to celcius"
-  [degrees]
-  (->> (- degrees 32.0)
-       (* (/ 5.0 9.0))))
-
-(defn deg->rad [d]
-  (* d (/ Math/PI 180)))
-
-(defn rad->deg [d]
-  (* d (/ 180 Math/PI)))
-
-(defn m->ft [m]
-  (* m 3.281))
 
 ;;-----------------------------------------------------------------------------
 ;; Formulas
 ;;-----------------------------------------------------------------------------
 
 (defn froude-number
-  [wind-speed-20ft
-   fire-line-intensity
-   temperature
-   ambient-gas-density
-   specific-heat-gas]
-  (let [;;gravity
-        g 9.81
-
-        ;; characteristic length of plume
-        L_c (-> (/ fire-line-intensity
+  "Returns froude number given:
+  wind-speed-20ft: (ms^-1)
+  fire-line-intensity: (kWm^-1)
+  temperature: (Kelvin)
+  ambient-gas-density: (kgm^-3)
+  specific-heat-gas: (KJkg^-1 K^-1)
+  "
+  [wind-speed-20ft fire-line-intensity temperature ambient-gas-density specific-heat-gas]
+  (let [g   9.81 ;(ms^-1) gravity
+        L_c (-> (/ fire-line-intensity ;characteristic length of plume
                    (* ambient-gas-density
                       specific-heat-gas
-                      (F->K temperature)
+                      (convert/F->K temperature)
                       (Math/sqrt g)))
                 (Math/pow (/ 2 3)))]
     (/ wind-speed-20ft
@@ -2308,12 +2284,20 @@ algorithm.
   (<= froude 1))
 
 (defn deviation-fb
+  "Returns standard deviation as described in Perryman 2013 EQ5 and EQ6 given:
+  froude number: (Int)
+  fire-line-intensity: (kWm^-1)
+  wind-speed-20ft: (ms^-1)"
   [froude fire-line-intensity wind-speed-20ft]
   (if (buoyancy-driven? froude)
     (+ (* 0.86 (Math/pow fire-line-intensity -0.21) (Math/pow wind-speed-20ft 0.44)) 0.19)
     (- (* 4.95 (Math/pow fire-line-intensity -0.01) (Math/pow wind-speed-20ft -0.02)) 3.48)))
 
 (defn mean-fb
+  "Returns mean as described in Perryman 2013 EQ5 and EQ6 given:
+  froude number: (Int)
+  fire-line-intensity: (kWm^-1)
+  wind-speed-20ft: (ms^-1)"
   [froude fire-line-intensity wind-speed-20ft]
   (if (buoyancy-driven? froude)
     (+ (* 1.47 (Math/pow fire-line-intensity 0.54) (Math/pow wind-speed-20ft -0.55)) 1.14)
@@ -2327,10 +2311,19 @@ algorithm.
         (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
            (* 2 (Math/pow deviation 2))))))
 
-(defn specific-heat-dry-fuel [initial-temp ignition-temp]
+(defn specific-heat-dry-fuel
+  "Returns specific heat of dry fuel given:
+  initiial-temp: (Celcius)
+  ignition-temp: (Celcius)
+  "
+  [initial-temp ignition-temp]
   (+ 0.266 (* 0.0016 (/ (+ ignition-temp initial-temp) 2))))
 
 (defn heat-of-preignition
+  "Returns heat of preignition given:
+  init-temperature: (Celcius)
+  ignition-temperature: (Celcius)
+  moisture content: (percent)"
   [init-temperature ignition-temperature moisture]
   (let [T_o init-temperature
         T_i ignition-temperature
@@ -2359,7 +2352,7 @@ algorithm.
                                (:M_f $))
         m                    (size-class-sum (fn [i j] (-> moisture-model i j)))
         total-moisture       (category-sum (fn [i] (-> m i)))
-        Q_ig                 (heat-of-preignition (F->C temperature) ignition-temperature total-moisture)
+        Q_ig                 (heat-of-preignition (convert/F->C temperature) ignition-temperature total-moisture)
         X                    (/ (- 400 Q_ig) 10)]
     (/ (* 0.000048 (Math/pow X 4.3)) 50)))
 
@@ -2411,7 +2404,7 @@ algorithm.
         parallel      (distribution/log-normal {:mu mean :sd deviation})
         perpendicular (distribution/normal {:mu 0 :sd 0.92})]
     (map (comp
-          (partial mapv m->ft)
+          (partial mapv convert/m->ft)
           vector)
          (distribution/sample num-firebrands parallel)
          (distribution/sample num-firebrands perpendicular))))
@@ -2428,8 +2421,8 @@ algorithm.
                t1 wind-direction
                t2 (rad->deg (Math/atan (/ d-perp d-paral)))
                t3 (+ t1 t2)]
-           [(* -1 H (Math/cos (deg->rad t3)))
-            (* H (Math/sin (deg->rad t3)))]))
+           [(* -1 H (Math/cos (convert/deg->rad t3)))
+            (* H (Math/sin (convert/deg->rad t3)))]))
        deltas))
 
 (defn firebrands
