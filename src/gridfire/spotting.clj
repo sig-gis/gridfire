@@ -106,7 +106,7 @@
                                (moisturize $ fuel-moisture)
                                (:M_f $))
         m                    (size-class-sum (fn [i j] (-> moisture-model i j)))
-        total-moisture       (category-sum (fn [i] (-> m i)))
+        total-moisture       (convert/dec->percent (category-sum (fn [i] (-> m i))))
         Q_ig                 (heat-of-preignition (convert/F->C temperature) ignition-temperature total-moisture)
         X                    (/ (- 400 Q_ig) 10)]
     (/ (* 0.000048 (Math/pow X 4.3)) 50)))
@@ -174,7 +174,7 @@
   (map (fn [[d-paral d-perp]]
          (let [H  (hypotenuse d-paral d-perp)
                t1 wind-direction
-               t2 (rad->deg (Math/atan (/ d-perp d-paral)))
+               t2 (convert/rad->deg (Math/atan (/ d-perp d-paral)))
                t3 (+ t1 t2)]
            [(* -1 H (Math/cos (convert/deg->rad t3)))
             (* H (Math/sin (convert/deg->rad t3)))]))

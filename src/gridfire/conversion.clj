@@ -36,3 +36,11 @@
   "Convert BTU per feet per second to kilowatt per meter."
   [Btu-ft-s]
   (/ Btu-ft-s 0.288894658272))
+
+(defn percent->dec
+  [p]
+  (* p 0.001))
+
+(defn dec->percent
+  [d]
+  (* d 100))
