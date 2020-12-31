@@ -53,14 +53,6 @@
     (+ (* 1.47 (Math/pow fire-line-intensity 0.54) (Math/pow wind-speed-20ft -0.55)) 1.14)
     (- (* 1.32 (Math/pow fire-line-intensity 0.26) (Math/pow wind-speed-20ft 0.11)) 0.02)))
 
-#_(defn sardoy-probability ;;FIXME Not used?
-    [distance mean deviation]
-    (* (/ 1
-          (* (Math/sqrt (* 2 Math/PI)) deviation distance))
-       (Math/exp
-        (/ (* -1 (Math/pow (- (Math/log distance) mean) 2))
-           (* 2 (Math/pow deviation 2))))))
-
 (defn specific-heat-dry-fuel
   "Returns specific heat of dry fuel given:
   initiial-temp: (Celcius)
