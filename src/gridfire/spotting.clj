@@ -121,8 +121,7 @@
    torched-origin
    [i j :as here]]
   (let [fuel-model-number    (m/mget (:fuel-model landfire-layers) i j)
-        ignition-probability (schroeder-ign-prob fuel-model-number
-                                                 relative-humidity
+        ignition-probability (schroeder-ign-prob relative-humidity
                                                  temperature)
         distance             (distance-3d (:elevation landfire-layers)
                                           cell-size
