@@ -2267,8 +2267,7 @@ algorithm.
   fire-line-intensity: (kWm^-1)
   temperature: (Kelvin)
   ambient-gas-density: (kgm^-3)
-  specific-heat-gas: (KJkg^-1 K^-1)
-  "
+  specific-heat-gas: (KJkg^-1 K^-1)"
   [wind-speed-20ft fire-line-intensity temperature ambient-gas-density specific-heat-gas]
   (let [g   9.81 ;(ms^-1) gravity
         L_c (-> (/ fire-line-intensity ;characteristic length of plume
@@ -2343,20 +2342,20 @@ algorithm.
         Q_d (* 540 M)]
     (+ Q_a Q_b Q_c Q_d)))
 
-(defn schroeder-ignition-probability [fuel-model-number relative-humidity temperature]
+(defn schroeder-ign-prob
+  "Returns the probability of ignition as described in Shroeder (1969) given:
+  relative-humidity: (%)
+  temperature: (Farenheit)"
+  [relative-humidity temperature]
   (let [ignition-temperature 320 ;;FIXME should this be a constant?
-        fuel-moisture        (fuel-moisture relative-humidity temperature)
-        moisture-model       (as-> (int fuel-model-number) $
-                               (build-fuel-model $)
-                               (moisturize $ fuel-moisture)
-                               (:M_f $))
-        m                    (size-class-sum (fn [i j] (-> moisture-model i j)))
-        total-moisture       (convert/dec->percent (category-sum (fn [i] (-> m i))))
-        Q_ig                 (heat-of-preignition (convert/F->C temperature) ignition-temperature total-moisture)
+        moisture             (-> (fuel-moisture relative-humidity temperature)
+                                 :dead
+                                 :1hr)
+        Q_ig                 (heat-of-preignition (convert/F->C temperature) ignition-temperature moisture)
         X                    (/ (- 400 Q_ig) 10)]
     (/ (* 0.000048 (Math/pow X 4.3)) 50)))
 
-(defn spot-ignition-probability
+(defn schroeder-ign-prob-adjusted
   [{:keys
     [cell-size global-clock landfire-layers
      multiplier-lookup perturbations]}
@@ -2367,9 +2366,9 @@ algorithm.
    torched-origin
    [i j :as here]]
   (let [fuel-model-number    (m/mget (:fuel-model landfire-layers) i j)
-        ignition-probability (schroeder-ignition-probability fuel-model-number
-                                                             relative-humidity
-                                                             temperature)
+        ignition-probability (schroeder-ign-prob fuel-model-number
+                                                 relative-humidity
+                                                 temperature)
         distance             (distance-3d (:elevation landfire-layers)
                                           cell-size
                                           here
@@ -2385,8 +2384,7 @@ algorithm.
   "Returns a sequence of [x y] distances (meters) that firebrands land away
   from a torched cell at i j where:
   x: parallel to the wind
-  y: perpendicular to the wind (positive values are to the right of wind direction)
-  "
+  y: perpendicular to the wind (positive values are to the right of wind direction)"
   [{:keys [fire-line-intensity] :as constants}
    {:keys [num-firebrands ambient-gas-density specific-heat-gas]}
    fire-line-intensity-matrix
@@ -2426,7 +2424,7 @@ algorithm.
        deltas))
 
 (defn firebrands
-  "Returns a sequence cells that firebrands land in"
+  "Returns a sequence of cells that firebrands land in"
   [[x y :as deltas] wind-direction cell cell-size]
   (let [step         (/ cell-size 2)
         cell-center  (mapv #(+ step (* % step)) cell)
