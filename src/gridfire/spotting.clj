@@ -5,10 +5,6 @@
                                      distance-3d
                                      fuel-moisture
                                      in-bounds?]]
-            [gridfire.fuel-models :refer [build-fuel-model
-                                          moisturize
-                                          size-class-sum
-                                          category-sum]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
 
