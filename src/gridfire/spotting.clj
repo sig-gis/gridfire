@@ -101,7 +101,7 @@
         X                    (/ (- 400 Q_ig) 10)]
     (/ (* 0.000048 (Math/pow X 4.3)) 50)))
 
-(defn schroeder-ign-prob-adjusted
+(defn spot-ignition-probability
   [{:keys [cell-size landfire-layers]}
    {:keys [decay-constant] :as spot-config}
    temperature
