@@ -432,6 +432,7 @@ science literature:
 - Flame Length and Fire Line Intensity: Byram 1959
 - Midflame Wind Adjustment Factor: Albini & Baughman 1979 parameterized as in BehavePlus, FARSITE, FlamMap, FSPro, and FPA according to Andrews 2012\nocite{Albini1979,Andrews2012}
 - Fire Spread on a Raster Grid: Morais 2001 (method of adaptive timesteps and fractional distances)
+- Spot Fire: Perryman 2013
 
 The following fuel models are supported:
 
@@ -2261,9 +2262,53 @@ pseudo-code lays out the steps taken in this procedure:
 This concludes our description of GridFire's raster-based fire spread
 algorithm.
 
-* Spotting Model
-** Spotting Model Definitions
 ** Spotting Model Forumulas
+
+Gridfire can optionally include spot fires using a cellular automata model
+described in Perryman 2013. The model is broken up into four submodels:
+Surface Spread, Tree Torching, Firebrand Dispersal, and Spot Ignition. For
+Surface Spread and Tree Torching, the Perryman model uses Rothermal (1972) and
+Van Wagner 1977 respectively. Gridfire will use the same models described in
+the previous sections.
+
+The Firebrand Dispersal model describes the distributions of firebrands relative
+to the wind direction. The location of where the firebrand lands is determined
+by the probabilties of landing d meters in the direction parallel and
+perpendicular to the wind.
+
+For determining the distance a firebrands should land parallel to the wind a
+lognormal probability density function is used from Sardoy (2008). Instead
+of calculating the probability GridFire will sample using a log-normal
+distribution using the mean and standard deviations derived from the fireline
+intensity and wind speed (Perryman 2013 Equation 5 or 6). To determine which
+pair of equations to use we must first determine if the plume is buoyancy driven
+or wind driven by calculating the Froude number.
+
+\begin{align*}
+Fr = \frac{U_H}{\sqrt{g(\frac{I_F}{\rho_{\infty}C_{cg}T_{\infty}g^{1/2}})^{2/3}}}
+\end{align*}
+
+For buyoancy-driven plumes the mean and standard deviation are calculated by:
+\begin{align*}
+\sigma_{FB} = 0.86 (I_F^{-0.21}U_H^{0.44}) + 0.19 \\
+\mu_{FB} = 1.47 (I_F^{0.54}U_H^{-0.55}) + 1.14
+\end{align*}
+
+and the mean and standard deviation for wind-driven plumes are calculated by:
+\begin{align*}
+\sigma_{FB} = 4.95 (I_F^{-0.01}U_H^{-0.02}) - 3.48 \\
+\mu_{FB} = 1.32 (I_F^{0.26}U_H^{0.11}) - 0.02
+\end{align*}
+
+For determining the distance a firebrands should land perpendicular to the wind
+a normal distribution with the mean of 0 and standard deviation of 0.92 is used,
+as described in Himoto and Tanaka (2005) (referenced in Perryman).
+
+Once we have the mean and standard deviation we can sample using log-normal
+distribution for the direction parallel to the wind and normal distribution for
+the direction perpendicular to the wind.
+
+#+name: sardoy-firebrand-dispersal
 #+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
 (ns gridfire.spotting
   (:require [clojure.core.matrix :as m]
@@ -2322,6 +2367,94 @@ algorithm.
     (+ (* 1.47 (Math/pow fire-line-intensity 0.54) (Math/pow wind-speed-20ft -0.55)) 1.14)
     (- (* 1.32 (Math/pow fire-line-intensity 0.26) (Math/pow wind-speed-20ft 0.11)) 0.02)))
 
+(defn sample-wind-dir-deltas
+  "Returns a sequence of [x y] distances (meters) that firebrands land away
+  from a torched cell at i j where:
+  x: parallel to the wind
+  y: perpendicular to the wind (positive values are to the right of wind direction)
+  "
+  [{:keys [spotting random-seed] :as config}
+   fire-line-intensity-matrix
+   wind-speed-20ft
+   temperature
+   [i j]]
+  (let [{:keys
+         [num-firebrands
+          ambient-gas-density
+          specific-heat-gas]} spotting
+        intensity             (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
+        froude                (froude-number intensity
+                                             wind-speed-20ft
+                                             temperature
+                                             ambient-gas-density
+                                             specific-heat-gas)
+        parallel              (distribution/log-normal {:mu (mean-fb froude intensity wind-speed-20ft)
+                                                        :sd (deviation-fb froude intensity wind-speed-20ft)})
+        perpendicular         (distribution/normal {:mu 0
+                                                    :sd 0.92})]
+    (map (comp
+          (partial mapv convert/m->ft)
+          vector)
+         (distribution/sample num-firebrands parallel {:seed random-seed})
+         (distribution/sample num-firebrands perpendicular {:seed random-seed}))))
+#+end_src
+
+Since the results are distance deltas relative to the wind direction we must
+convert  this to deltas in our coordinate plane. We can convert
+these deltas by using trigonometric functions.
+
+#+name: convert-deltas
+#+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
+
+(defn hypotenuse [x y]
+  (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
+
+(defn deltas-wind->coord
+  "Converts deltas from the torched tree in the wind direction to deltas
+  in the coordinate plane"
+  [deltas wind-direction]
+  (map (fn [[d-paral d-perp]]
+         (let [H  (hypotenuse d-paral d-perp)
+               t1 wind-direction
+               t2 (convert/rad->deg (Math/atan (/ d-perp d-paral)))
+               t3 (+ t1 t2)]
+           [(* -1 H (Math/cos (convert/deg->rad t3)))
+            (* H (Math/sin (convert/deg->rad t3)))]))
+       deltas))
+
+(defn firebrands
+  "Returns a sequence of cells that firebrands land in"
+  [deltas wind-towards-direction cell cell-size]
+  (let [step         (/ cell-size 2)
+        cell-center  (mapv #(+ step (* % step)) cell)
+        coord-deltas (deltas-wind->coord deltas wind-towards-direction)]
+    (map (comp
+          (partial map int)
+          (partial map #(quot % step))
+          (partial map + cell-center))
+         coord-deltas)))
+#+end_src
+
+The Spot Ignition model describes the probability of a spot ignition as well as
+when the spot ignition should occur. Perryman uses the method described in
+Schroeder (1969) but adjusts the result to take into account the distance a
+firebrand lands from the source tree (using Albini 1979) and the number of
+firebrands that land in a cell (using Stauffer 2008).
+
+
+\begin{align*}
+P(I)_d = P(I)exp(-\lambda_sd)
+P(I)_d^{FB} = 1 - (1 - P(I)_d)^b
+\end{align*}
+
+where \lambda is a positive number representing the decay constant, d is the
+firebrand's landing distance away from the source cell. $P(I)_d$ is the
+probability of spot ignition taking into consideration of d. $P(I)_d^{FB}$ is
+the probability of spot fire ignition taking into consideration b, the number of
+firebrands landing in a cell.
+
+#+name: firebrand-ignition-probability
+#+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
 (defn specific-heat-dry-fuel
   "Returns specific heat of dry fuel given:
   initiial-temp: (Celcius)
@@ -2383,6 +2516,22 @@ algorithm.
                                                  torched-origin))
         decay-factor         (Math/exp (* -1 decay-constant distance))]
     (- 1 (Math/pow (- 1 (* ignition-probability decay-factor)) firebrand-count))))
+#+end_src
+
+A firebrand will cause an unburened cell to transition to a burned state if the
+cell receives atleast one firebrand and the cell's probability of ignition as
+calculated by the above equations is greater than a randomly generated uniform number.
+Once a cell has been determined to ignite then the time until ignition is
+calculated. The time until ignition is a sum of three time intervals: the amount
+of time required for the firebrand to reach its maximum vertical height $t_v$,
+the amount of time required for the firebrand to descend from the maximum
+vertical height to the forest floor $t_g$, and the amount of time required for a
+spot fire to ignite and build up to the steady-state $t_I$. Perryman assumes $t_v$
+and $t_g$ to be equal and used the formula from Albini (1979) to calculate it.
+$t_I$ is also assumed to be 20 min as used in McAlpine and Wakimoto (1991).
+
+#+name: firebrands-time-of-ignition
+#+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
 
 (defn spot-ignition?
   [rand-gen spot-ignition-probability]
@@ -2406,69 +2555,16 @@ algorithm.
                                (* (/ a 3.0)
                                   (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1))))]
     (+ global-clock (* 2 t-max-height) 20)))
+#+end_src
+>>>>>>> add documentation for spotting model work
 
-;;-----------------------------------------------------------------------------
-;; Main
-;;-----------------------------------------------------------------------------
-
-(defn sample-wind-dir-deltas
-  "Returns a sequence of [x y] distances (meters) that firebrands land away
-  from a torched cell at i j where:
-  x: parallel to the wind
-  y: perpendicular to the wind (positive values are to the right of wind direction)"
-  [{:keys [spotting random-seed] :as config}
-   fire-line-intensity-matrix
-   wind-speed-20ft
-   temperature
-   [i j]]
-  (let [{:keys
-         [num-firebrands
-          ambient-gas-density
-          specific-heat-gas]} spotting
-        intensity             (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
-        froude                (froude-number intensity
-                                             wind-speed-20ft
-                                             temperature
-                                             ambient-gas-density
-                                             specific-heat-gas)
-        parallel              (distribution/log-normal {:mu (mean-fb froude intensity wind-speed-20ft)
-                                                        :sd (deviation-fb froude intensity wind-speed-20ft)})
-        perpendicular         (distribution/normal {:mu 0
-                                                    :sd 0.92})]
-    (map (comp
-          (partial mapv convert/m->ft)
-          vector)
-         (distribution/sample num-firebrands parallel {:seed random-seed})
-         (distribution/sample num-firebrands perpendicular {:seed random-seed}))))
-
-(defn hypotenuse [x y]
-  (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
-
-(defn deltas-wind->coord
-  "Converts deltas from the torched tree in the wind direction to deltas
-  in the coordinate plane"
-  [deltas wind-direction]
-  (map (fn [[d-paral d-perp]]
-         (let [H  (hypotenuse d-paral d-perp)
-               t1 wind-direction
-               t2 (convert/rad->deg (Math/atan (/ d-perp d-paral)))
-               t3 (+ t1 t2)]
-           [(* -1 H (Math/cos (convert/deg->rad t3)))
-            (* H (Math/sin (convert/deg->rad t3)))]))
-       deltas))
-
-(defn firebrands
-  "Returns a sequence of cells that firebrands land in"
-  [deltas wind-towards-direction cell cell-size]
-  (let [step         (/ cell-size 2)
-        cell-center  (mapv #(+ step (* % step)) cell)
-        coord-deltas (deltas-wind->coord deltas wind-towards-direction)]
-    (map (comp
-          (partial map int)
-          (partial map #(quot % step))
-          (partial map + cell-center))
-         coord-deltas)))
-
+Once the locations, ignition probabilities, and time of ignition has been
+calculated for each of the firebrands a sequence of key value pairs are
+returned, to be processed in `gridfire.cli`. The key is [x y] location of the
+firebrand and the value [t p] where t is the time of igintion and p is the
+ignition probability.
+#+name: spread-firebrands
+#+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
 (defn update-firebrand-counts!
   [{:keys [num-rows num-cols landfire-layers]}
    firebrand-count-matrix
@@ -3739,6 +3835,26 @@ by setting `{:spatial-type :pixel}.
      constants
      layers-to-update)))
 #+end_src
+
+** Section 7: Spotting
+
+Gridfire supports spot fires.
+To specify this in the config file include the following mappings:
+*spotting:* a map of constants
+
+The map of constants includes these options:
+ambient-gas-density: float
+specific-heat-gas: float
+num-firebrands: number of firebrands each torched tree will produce
+decay-constant: positive number
+
+#+begin_src clojure
+{:spotting {:ambient-gas-density 1.1     ;(kgm^-3)
+            :specific-heat-gas   1121.0  ;(KJkg^-1 K^-1)
+            :num-firebrands      50
+            :decay-constant      0.005}}
+#+end_src
+
 
 * Example Configuration files
 

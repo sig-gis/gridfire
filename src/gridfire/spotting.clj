@@ -1,4 +1,4 @@
-;; [[file:../../org/GridFire.org::*Spotting Model Forumulas][Spotting Model Forumulas:1]]
+;; [[file:../../org/GridFire.org::sardoy-firebrand-dispersal][sardoy-firebrand-dispersal]]
 (ns gridfire.spotting
   (:require [clojure.core.matrix :as m]
             [gridfire.common :refer [extract-constants
@@ -56,6 +56,39 @@
     (+ (* 1.47 (Math/pow fire-line-intensity 0.54) (Math/pow wind-speed-20ft -0.55)) 1.14)
     (- (* 1.32 (Math/pow fire-line-intensity 0.26) (Math/pow wind-speed-20ft 0.11)) 0.02)))
 
+(defn sample-wind-dir-deltas
+  "Returns a sequence of [x y] distances (meters) that firebrands land away
+  from a torched cell at i j where:
+  x: parallel to the wind
+  y: perpendicular to the wind (positive values are to the right of wind direction)
+  "
+  [{:keys [spotting random-seed] :as config}
+   fire-line-intensity-matrix
+   wind-speed-20ft
+   temperature
+   [i j]]
+  (let [{:keys
+         [num-firebrands
+          ambient-gas-density
+          specific-heat-gas]} spotting
+        intensity             (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
+        froude                (froude-number intensity
+                                             wind-speed-20ft
+                                             temperature
+                                             ambient-gas-density
+                                             specific-heat-gas)
+        parallel              (distribution/log-normal {:mu (mean-fb froude intensity wind-speed-20ft)
+                                                        :sd (deviation-fb froude intensity wind-speed-20ft)})
+        perpendicular         (distribution/normal {:mu 0
+                                                    :sd 0.92})]
+    (map (comp
+          (partial mapv convert/m->ft)
+          vector)
+         (distribution/sample num-firebrands parallel {:seed random-seed})
+         (distribution/sample num-firebrands perpendicular {:seed random-seed}))))
+
+;; sardoy-firebrand-dispersal ends here
+;; [[file:../../org/GridFire.org::firebrand-ignition-probability][firebrand-ignition-probability]]
 (defn specific-heat-dry-fuel
   "Returns specific heat of dry fuel given:
   initiial-temp: (Celcius)
@@ -118,6 +151,10 @@
         decay-factor         (Math/exp (* -1 decay-constant distance))]
     (- 1 (Math/pow (- 1 (* ignition-probability decay-factor)) firebrand-count))))
 
+;; firebrand-ignition-probability ends here
+
+;; [[file:../../org/GridFire.org::firebrands-time-of-ignition][firebrands-time-of-ignition]]
+
 (defn spot-ignition?
   [rand-gen spot-ignition-probability]
   (let [random-number (random-float 0 1 rand-gen)]
@@ -141,39 +178,13 @@
                                   (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1))))]
     (+ global-clock (* 2 t-max-height) 20)))
 
+;; firebrands-time-of-ignition ends here
+
 ;;-----------------------------------------------------------------------------
 ;; Main
 ;;-----------------------------------------------------------------------------
 
-(defn sample-wind-dir-deltas
-  "Returns a sequence of [x y] distances (meters) that firebrands land away
-  from a torched cell at i j where:
-  x: parallel to the wind
-  y: perpendicular to the wind (positive values are to the right of wind direction)"
-  [{:keys [spotting random-seed] :as config}
-   fire-line-intensity-matrix
-   wind-speed-20ft
-   temperature
-   [i j]]
-  (let [{:keys
-         [num-firebrands
-          ambient-gas-density
-          specific-heat-gas]} spotting
-        intensity             (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
-        froude                (froude-number intensity
-                                             wind-speed-20ft
-                                             temperature
-                                             ambient-gas-density
-                                             specific-heat-gas)
-        parallel              (distribution/log-normal {:mu (mean-fb froude intensity wind-speed-20ft)
-                                                        :sd (deviation-fb froude intensity wind-speed-20ft)})
-        perpendicular         (distribution/normal {:mu 0
-                                                    :sd 0.92})]
-    (map (comp
-          (partial mapv convert/m->ft)
-          vector)
-         (distribution/sample num-firebrands parallel {:seed random-seed})
-         (distribution/sample num-firebrands perpendicular {:seed random-seed}))))
+;; [[file:../../org/GridFire.org::convert-deltas][convert-deltas]]
 
 (defn hypotenuse [x y]
   (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
@@ -202,7 +213,9 @@
           (partial map #(quot % step))
           (partial map + cell-center))
          coord-deltas)))
+;; convert-deltas ends here
 
+;; [[file:../../org/GridFire.org::spread-firebrands][spread-firebrands]]
 (defn update-firebrand-counts!
   [{:keys [num-rows num-cols landfire-layers]}
    firebrand-count-matrix
@@ -266,4 +279,4 @@
                                                (convert/mph->mps wind-speed-20ft))]
                  [[x y] [t spot-ignition-p]])))
            (remove nil?)))))
-;; Spotting Model Forumulas:1 ends here
+;; spread-firebrands ends here
