@@ -2405,7 +2405,6 @@ these deltas by using trigonometric functions.
 
 #+name: convert-deltas
 #+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
-
 (defn hypotenuse [x y]
   (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
 
@@ -2532,7 +2531,6 @@ $t_I$ is also assumed to be 20 min as used in McAlpine and Wakimoto (1991).
 
 #+name: firebrands-time-of-ignition
 #+begin_src clojure :results silent :exports code :tangle ../src/gridfire/spotting.clj :padline no :no-expand :comments link
-
 (defn spot-ignition?
   [rand-gen spot-ignition-probability]
   (let [random-number (random-float 0 1 rand-gen)]

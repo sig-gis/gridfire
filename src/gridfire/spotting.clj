@@ -86,8 +86,36 @@
           vector)
          (distribution/sample num-firebrands parallel {:seed random-seed})
          (distribution/sample num-firebrands perpendicular {:seed random-seed}))))
-
 ;; sardoy-firebrand-dispersal ends here
+;; [[file:../../org/GridFire.org::convert-deltas][convert-deltas]]
+(defn hypotenuse [x y]
+  (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
+
+(defn deltas-wind->coord
+  "Converts deltas from the torched tree in the wind direction to deltas
+  in the coordinate plane "
+  [deltas wind-direction]
+  (map (fn [[d-paral d-perp]]
+         (let [H  (hypotenuse d-paral d-perp)
+               t1 wind-direction
+               t2 (convert/rad->deg (Math/atan (/ d-perp d-paral)))
+               t3 (+ t1 t2)]
+           [(* -1 H (Math/cos (convert/deg->rad t3)))
+            (* H (Math/sin (convert/deg->rad t3)))]))
+       deltas))
+
+(defn firebrands
+  "Returns a sequence of cells that firebrands land in"
+  [deltas wind-towards-direction cell cell-size]
+  (let [step         (/ cell-size 2)
+        cell-center  (mapv #(+ step (* % step)) cell)
+        coord-deltas (deltas-wind->coord deltas wind-towards-direction)]
+    (map (comp
+          (partial map int)
+          (partial map #(quot % step))
+          (partial map + cell-center))
+         coord-deltas)))
+;; convert-deltas ends here
 ;; [[file:../../org/GridFire.org::firebrand-ignition-probability][firebrand-ignition-probability]]
 (defn specific-heat-dry-fuel
   "Returns specific heat of dry fuel given:
@@ -150,11 +178,8 @@
                                                  torched-origin))
         decay-factor         (Math/exp (* -1 decay-constant distance))]
     (- 1 (Math/pow (- 1 (* ignition-probability decay-factor)) firebrand-count))))
-
 ;; firebrand-ignition-probability ends here
-
 ;; [[file:../../org/GridFire.org::firebrands-time-of-ignition][firebrands-time-of-ignition]]
-
 (defn spot-ignition?
   [rand-gen spot-ignition-probability]
   (let [random-number (random-float 0 1 rand-gen)]
@@ -179,42 +204,6 @@
     (+ global-clock (* 2 t-max-height) 20)))
 
 ;; firebrands-time-of-ignition ends here
-
-;;-----------------------------------------------------------------------------
-;; Main
-;;-----------------------------------------------------------------------------
-
-;; [[file:../../org/GridFire.org::convert-deltas][convert-deltas]]
-
-(defn hypotenuse [x y]
-  (Math/sqrt (+ (Math/pow x 2) (Math/pow y 2))))
-
-(defn deltas-wind->coord
-  "Converts deltas from the torched tree in the wind direction to deltas
-  in the coordinate plane"
-  [deltas wind-direction]
-  (map (fn [[d-paral d-perp]]
-         (let [H  (hypotenuse d-paral d-perp)
-               t1 wind-direction
-               t2 (convert/rad->deg (Math/atan (/ d-perp d-paral)))
-               t3 (+ t1 t2)]
-           [(* -1 H (Math/cos (convert/deg->rad t3)))
-            (* H (Math/sin (convert/deg->rad t3)))]))
-       deltas))
-
-(defn firebrands
-  "Returns a sequence of cells that firebrands land in"
-  [deltas wind-towards-direction cell cell-size]
-  (let [step         (/ cell-size 2)
-        cell-center  (mapv #(+ step (* % step)) cell)
-        coord-deltas (deltas-wind->coord deltas wind-towards-direction)]
-    (map (comp
-          (partial map int)
-          (partial map #(quot % step))
-          (partial map + cell-center))
-         coord-deltas)))
-;; convert-deltas ends here
-
 ;; [[file:../../org/GridFire.org::spread-firebrands][spread-firebrands]]
 (defn update-firebrand-counts!
   [{:keys [num-rows num-cols landfire-layers]}
