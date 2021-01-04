@@ -3,27 +3,6 @@
    [clojure.core.matrix :as m]
    [gridfire.perturbation :as perturbation]))
 
-(defn matrix-value-at [[i j] global-clock matrix]
-  (if (> (m/dimensionality matrix) 2)
-    (let [band (int (quot global-clock 60.0))] ;Assuming each band is 1 hour
-      (m/mget matrix band i j))
-    (m/mget matrix i j)))
-
-(defn sample-at
-  [here global-clock matrix multiplier perturb-info]
-  (let [cell       (if multiplier
-                     (map #(quot % multiplier) here)
-                     here)
-        value-here (matrix-value-at cell global-clock matrix)]
-    (if perturb-info
-      (if-let [freq (:frequency perturb-info)]
-        (+ value-here (perturbation/value-at perturb-info matrix cell (quot global-clock freq)))
-        (+ value-here (perturbation/value-at perturb-info matrix cell)))
-      value-here)))
-
-(def sample-at
-  (memoize sample-at))
-
 (defn calc-emc
   "Computes the Equilibrium Moisture Content (EMC) from rh (relative
    humidity in %) and temp (temperature in F)."

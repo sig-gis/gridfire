@@ -1,8 +1,7 @@
 ;; [[file:../../org/GridFire.org::*Spotting Model Forumulas][Spotting Model Forumulas:1]]
 (ns gridfire.spotting
   (:require [clojure.core.matrix :as m]
-            [gridfire.common :refer [sample-at
-                                     distance-3d
+            [gridfire.common :refer [distance-3d
                                      fuel-moisture
                                      in-bounds?]]
             [gridfire.conversion :as convert]
