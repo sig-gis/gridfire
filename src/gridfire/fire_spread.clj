@@ -117,16 +117,16 @@
                               (+ surface-intensity crown-intensity)
                               surface-intensity)
         flame-length        (byram-flame-length fire-line-intensity)]
-    {:cell                 neighbor
-     :trajectory           trajectory
-     :terrain-distance     (distance-3d (:elevation landfire-layers) cell-size here neighbor)
-     :spread-rate          spread-rate
-     :fire-line-intensity  fire-line-intensity
-     :flame-length         flame-length
-     :fractional-distance  (volatile! (if (= trajectory overflow-trajectory)
-                                       overflow-heat
-                                       0.0))
-     :crown-fire?          crown-fire?}))
+    {:cell                neighbor
+     :trajectory          trajectory
+     :terrain-distance    (distance-3d (:elevation landfire-layers) cell-size here neighbor)
+     :spread-rate         spread-rate
+     :fire-line-intensity fire-line-intensity
+     :flame-length        flame-length
+     :fractional-distance (volatile! (if (= trajectory overflow-trajectory)
+                                        overflow-heat
+                                        0.0))
+     :crown-fire?         crown-fire?}))
 
 (defn compute-neighborhood-fire-spread-rates!
   "Returns a vector of entries of the form {:cell [i j], :trajectory [di dj],
