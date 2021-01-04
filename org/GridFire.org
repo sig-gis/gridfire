@@ -2019,10 +2019,10 @@ pseudo-code lays out the steps taken in this procedure:
 (defn identify-spot-ignition-events
   [global-clock spot-ignited-cells]
   (let [to-ignite-now (group-by (fn [[cell [time ign-prob]]]
-                                  (> global-clock time))
+                                  (>= global-clock time))
                                 spot-ignited-cells)
-        ignite-later  (or (:false to-ignite-now) {})
-        ignite-now    (or (:true to-ignite-now) {})]
+        ignite-later  (or (get to-ignite-now false) {})
+        ignite-now    (or (get to-ignite-now true) {})]
     [ignite-later ignite-now]))
 
 (defn update-spot-ignited-cells
