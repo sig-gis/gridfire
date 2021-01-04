@@ -124,8 +124,8 @@
      :fire-line-intensity fire-line-intensity
      :flame-length        flame-length
      :fractional-distance (volatile! (if (= trajectory overflow-trajectory)
-                                        overflow-heat
-                                        0.0))
+                                       overflow-heat
+                                       0.0))
      :crown-fire?         crown-fire?}))
 
 (defn compute-neighborhood-fire-spread-rates!

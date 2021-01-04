@@ -1893,8 +1893,8 @@ pseudo-code lays out the steps taken in this procedure:
      :fire-line-intensity fire-line-intensity
      :flame-length        flame-length
      :fractional-distance (volatile! (if (= trajectory overflow-trajectory)
-                                        overflow-heat
-                                        0.0))
+                                       overflow-heat
+                                       0.0))
      :crown-fire?         crown-fire?}))
 
 (defn compute-neighborhood-fire-spread-rates!
@@ -2028,7 +2028,7 @@ pseudo-code lays out the steps taken in this procedure:
   [constants fire-spread-matrix cells]
   (when (seq cells)
     (into {}
-          (for [[index cell] (map-indexed vector cells)]
+          (for [cell cells]
             [cell (compute-neighborhood-fire-spread-rates!
                    constants
                    fire-spread-matrix
