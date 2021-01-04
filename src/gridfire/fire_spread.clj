@@ -453,11 +453,11 @@
                   ignited-cells)))))
 
 (defn- initialize-matrix
-  [num-rows num-cols indices val]
+  [num-rows num-cols indices]
   (let [matrix (m/zero-matrix num-rows num-cols)]
     (doseq [[i j] indices
             :when (in-bounds? num-rows num-cols [i j])]
-      (m/mset! matrix i j val))
+      (m/mset! matrix i j -1))
     matrix))
 
 (defn- get-non-zero-indices [m]
@@ -471,9 +471,9 @@
    initial-ignition-raster]
   (let [fire-spread-matrix         (m/mutable (:matrix initial-ignition-raster))
         non-zero-indices           (get-non-zero-indices fire-spread-matrix)
-        flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices -1)
-        fire-line-intensity-matrix (initialize-matrix num-rows num-cols non-zero-indices -1)
-        burn-time-matrix           (initialize-matrix num-rows num-cols non-zero-indices -1)
+        flame-length-matrix        (initialize-matrix num-rows num-cols non-zero-indices)
+        fire-line-intensity-matrix (initialize-matrix num-rows num-cols non-zero-indices)
+        burn-time-matrix           (initialize-matrix num-rows num-cols non-zero-indices)
         firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))
         ignited-cells              (generate-ignited-cells constants fire-spread-matrix non-zero-indices)]
     (run-loop (merge
