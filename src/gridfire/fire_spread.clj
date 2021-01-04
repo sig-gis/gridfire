@@ -2,7 +2,7 @@
 (ns gridfire.fire-spread
   (:require [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as mop]
-            [gridfire.common :refer [sample-at fuel-moisture]]
+            [gridfire.common :refer [fuel-moisture]]
             [gridfire.crown-fire :refer [crown-fire-eccentricity
                                          crown-fire-line-intensity
                                          cruz-crown-fire-spread
