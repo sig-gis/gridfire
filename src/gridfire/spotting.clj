@@ -134,8 +134,7 @@
   "Returns a sequence of [x y] distances (meters) that firebrands land away
   from a torched cell at i j where:
   x: parallel to the wind
-  y: perpendicular to the wind (positive values are to the right of wind direction)
-  "
+  y: perpendicular to the wind (positive values are to the right of wind direction)"
   [{:keys [spotting random-seed] :as config}
    fire-line-intensity-matrix
    wind-speed-20ft
@@ -166,7 +165,7 @@
 
 (defn deltas-wind->coord
   "Converts deltas from the torched tree in the wind direction to deltas
-  in the coordinate plane "
+  in the coordinate plane"
   [deltas wind-direction]
   (map (fn [[d-paral d-perp]]
          (let [H  (hypotenuse d-paral d-perp)
@@ -179,10 +178,10 @@
 
 (defn firebrands
   "Returns a sequence of cells that firebrands land in"
-  [deltas wind-to-direction cell cell-size]
+  [deltas wind-towards-dir cell cell-size]
   (let [step         (/ cell-size 2)
         cell-center  (mapv #(+ step (* % step)) cell)
-        coord-deltas (deltas-wind->coord deltas wind-to-direction)]
+        coord-deltas (deltas-wind->coord deltas wind-towards-dir)]
     (map (comp
           (partial map int)
           (partial map #(quot % step))
