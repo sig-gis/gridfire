@@ -98,17 +98,14 @@
     (/ (* 0.000048 (Math/pow X 4.3)) 50)))
 
 (defn schroeder-ign-prob-adjusted
-  [{:keys
-    [cell-size global-clock landfire-layers
-     multiplier-lookup perturbations]}
+  [{:keys [cell-size landfire-layers]}
    {:keys [decay-constant] :as spot-config}
    temperature
    relative-humidity
    firebrand-count
    torched-origin
    [i j :as here]]
-  (let [fuel-model-number    (m/mget (:fuel-model landfire-layers) i j)
-        ignition-probability (schroeder-ign-prob relative-humidity
+  (let [ignition-probability (schroeder-ign-prob relative-humidity
                                                  temperature)
         distance             (distance-3d (:elevation landfire-layers)
                                           cell-size
