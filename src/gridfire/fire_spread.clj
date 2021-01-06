@@ -321,7 +321,8 @@
                                                                  ignition-event
                                                                  firebrand-count-matrix
                                                                  fire-spread-matrix
-                                                                 fire-line-intensity-matrix))]
+                                                                 fire-line-intensity-matrix
+                                                                 flame-length-matrix))]
                 (vreset! temp-spot-cells (merge-with (partial min-key first)
                                                      @temp-spot-cells spot-ignitions))))))
         (let [[spot-ignite-later ignited-cells] (update-spot-ignited-cells constants
