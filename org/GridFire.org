@@ -2028,24 +2028,25 @@ pseudo-code lays out the steps taken in this procedure:
 (defn update-spot-ignited-cells
   [constants
    global-clock
-   temp-spot-cells
-   spot-ignite-later
+   new-spot-ignitions
+   spot-ignitions
    fire-spread-matrix
    burn-time-matrix
    ignited-cells]
-  (let [spot-ignited-cells (merge-with (partial min-key first) spot-ignite-later @temp-spot-cells)
-        [spot-ignite-later
-         spot-ignite-now]  (identify-spot-ignition-events global-clock spot-ignited-cells)
-        cells              (keys spot-ignite-now)
-        spot-ignited-cells (generate-ignited-cells constants
+  (let [[spot-ignite-later
+         spot-ignite-now]  (identify-spot-ignition-events global-clock
+                                                          (merge-with (partial min-key first)
+                                                                      spot-ignitions
+                                                                      @new-spot-ignitions))
+        new-spot-ignited-cells (generate-ignited-cells constants
                                                    fire-spread-matrix
-                                                   cells)
-        ignited-cells      (merge ignited-cells spot-ignited-cells)]
+                                                   (keys spot-ignite-now))
+        ignited-cells      (merge ignited-cells new-spot-ignited-cells)]
     (doseq [cell spot-ignite-now
             :let [[i j] (key cell)]]
       (m/mset! fire-spread-matrix i j 1.0)
       (m/mset! burn-time-matrix i j global-clock))
-    [spot-ignite-later ignited-cells]))
+    [(into {} spot-ignite-later) ignited-cells]))
 
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
