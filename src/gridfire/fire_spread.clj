@@ -204,7 +204,7 @@
            (if (>= new-total 1.0)
              {:cell cell :trajectory trajectory :fractional-distance @fractional-distance
               :flame-length flame-length :fire-line-intensity fire-line-intensity
-              :crown-fire crown-fire?})))
+              :crown-fire? crown-fire?})))
        (remove nil?)
        (group-by :cell)
        (map (fn [[cell trajectories]] (apply max-key :fractional-distance trajectories)))
@@ -248,36 +248,53 @@
                    0.0)]))))
 
 (defn identify-spot-ignition-events
-  [global-clock spot-ignited-cells]
+  [global-clock spot-ignitions]
   (let [to-ignite-now (group-by (fn [[cell [time ign-prob]]]
                                   (>= global-clock time))
-                                spot-ignited-cells)
-        ignite-later  (or (get to-ignite-now false) {})
-        ignite-now    (or (get to-ignite-now true) {})]
+                                spot-ignitions)
+        ignite-later  (into {} (get to-ignite-now false))
+        ignite-now    (into {} (get to-ignite-now true))]
     [ignite-later ignite-now]))
 
-(defn update-spot-ignited-cells
+(defn spot-ignited-cells
   [constants
    global-clock
-   new-spot-ignitions
-   spot-ignitions
+   spot-ignite-now
    fire-spread-matrix
-   burn-time-matrix
-   ignited-cells]
-  (let [[spot-ignite-later
-         spot-ignite-now]  (identify-spot-ignition-events global-clock
-                                                          (merge-with (partial min-key first)
-                                                                      spot-ignitions
-                                                                      @new-spot-ignitions))
-        new-spot-ignited-cells (generate-ignited-cells constants
-                                                   fire-spread-matrix
-                                                   (keys spot-ignite-now))
-        ignited-cells      (merge ignited-cells new-spot-ignited-cells)]
+   burn-time-matrix]
+  (let [ignited-cells (generate-ignited-cells constants
+                                              fire-spread-matrix
+                                              (keys spot-ignite-now))]
     (doseq [cell spot-ignite-now
             :let [[i j] (key cell)]]
       (m/mset! fire-spread-matrix i j 1.0)
       (m/mset! burn-time-matrix i j global-clock))
-    [(into {} spot-ignite-later) ignited-cells]))
+    ignited-cells))
+
+(defn new-spot-ignitions
+  [{:keys [spotting] :as config}
+   constants
+   ignition-events
+   firebrand-count-matrix
+   fire-spread-matrix
+   fire-line-intensity-matrix
+   flame-length-matrix]
+  (when spotting
+    (reduce (fn [acc ignition-event]
+              (merge-with (partial min-key first)
+                          acc
+                          (->> (spot/spread-firebrands
+                                constants
+                                config
+                                ignition-event
+                                firebrand-count-matrix
+                                fire-spread-matrix
+                                fire-line-intensity-matrix
+                                flame-length-matrix)
+                               (into {}))))
+            {}
+            ignition-events)))
+
 
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
@@ -290,7 +307,7 @@
    burn-time-matrix]
   (loop [global-clock      0.0
          ignited-cells     ignited-cells
-         spot-ignite-later {}]
+         spot-ignitions {}]
     (if (and (< global-clock max-runtime)
              (seq ignited-cells))
       (let [dt                (->> ignited-cells
@@ -304,36 +321,38 @@
                                 dt)
             next-global-clock (+ global-clock timestep)
             ignition-events   (identify-ignition-events ignited-cells timestep)
-            constants         (perturbation/update-global-vals constants global-clock next-global-clock)
-            temp-spot-cells   (volatile! {})]
+            constants         (perturbation/update-global-vals constants global-clock next-global-clock)]
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
-        (doseq [{:keys [cell flame-length fire-line-intensity crown-fire?] :as ignition-event} ignition-events]
+        (doseq [{:keys [cell flame-length fire-line-intensity] :as ignition-event} ignition-events]
           (let [[i j] cell]
             (m/mset! fire-spread-matrix         i j 1.0)
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
-            (m/mset! burn-time-matrix           i j global-clock)
-            (when spotting
-              (let [spot-ignitions (into {}
-                                         (spot/spread-firebrands (merge constants {:global-clock global-clock})
-                                                                 config
-                                                                 ignition-event
-                                                                 firebrand-count-matrix
-                                                                 fire-spread-matrix
-                                                                 fire-line-intensity-matrix
-                                                                 flame-length-matrix))]
-                (vreset! temp-spot-cells (merge-with (partial min-key first)
-                                                     @temp-spot-cells spot-ignitions))))))
-        (let [[spot-ignite-later ignited-cells] (update-spot-ignited-cells constants
-                                                                           global-clock
-                                                                           temp-spot-cells
-                                                                           spot-ignite-later
-                                                                           fire-spread-matrix
-                                                                           burn-time-matrix
-                                                                           ignited-cells)]
+            (m/mset! burn-time-matrix           i j global-clock)))
+        (let [new-spot-ignitions (new-spot-ignitions config
+                                                     (assoc constants :global-clock global-clock)
+                                                     ignition-events
+                                                     firebrand-count-matrix
+                                                     fire-spread-matrix
+                                                     flame-length-matrix
+                                                     fire-line-intensity-matrix)
+              [spot-ignite-later
+               spot-ignite-now]  (identify-spot-ignition-events global-clock
+                                                                (merge-with (partial min-key first)
+                                                                            spot-ignitions
+                                                                            new-spot-ignitions))
+              spot-ignited-cells (spot-ignited-cells constants
+                                                     global-clock
+                                                     spot-ignite-now
+                                                     fire-spread-matrix
+                                                     burn-time-matrix)]
           (recur next-global-clock
-                 (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix global-clock)
+                 (update-ignited-cells constants
+                                       (merge spot-ignited-cells ignited-cells)
+                                       ignition-events
+                                       fire-spread-matrix
+                                       global-clock)
                  spot-ignite-later)))
       {:global-clock               global-clock
        :initial-ignition-site      initial-ignition-site

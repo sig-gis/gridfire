@@ -199,13 +199,11 @@
   [{:keys [num-rows num-cols landfire-layers]}
    firebrand-count-matrix
    fire-spread-matrix
-   [i j :as source]
    firebrands]
   (doseq [[x y :as here] firebrands
           :when          (and (in-bounds? num-rows num-cols [x y])
                               (burnable? fire-spread-matrix
                                          (:fuel-model landfire-layers)
-                                         source
                                          here))
           :let           [new-count (inc (m/mget firebrand-count-matrix x y))]]
     (m/mset! firebrand-count-matrix x y new-count)))
@@ -237,10 +235,10 @@
                                                         cell)
           wind-to-direction     (mod (+ 180 wind-from-direction) 360)
           firebrands            (firebrands deltas wind-to-direction cell cell-size)]
-      (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix cell firebrands)
+      (update-firebrand-counts! constants firebrand-count-matrix fire-spread-matrix firebrands)
       (->> (for [[x y] firebrands
                  :when (and (in-bounds? num-rows num-cols [x y])
-                            (burnable? fire-spread-matrix (:fuel-model landfire-layers) cell [x y]))
+                            (burnable? fire-spread-matrix (:fuel-model landfire-layers) [x y]))
                  :let  [firebrand-count (m/mget firebrand-count-matrix x y)
                         spot-ignition-p (spot-ignition-probability constants
                                                                    spotting
