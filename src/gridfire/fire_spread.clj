@@ -346,7 +346,8 @@
             constants         (perturbation/update-global-vals constants global-clock next-global-clock)]
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
-        (doseq [{:keys [cell flame-length fire-line-intensity] :as ignition-event} ignition-events]
+        (doseq [{:keys [cell flame-length fire-line-intensity
+                        ignition-probability] :as ignition-event} ignition-events]
           (let [[i j] cell]
             (m/mset! fire-spread-matrix         i j ignition-probability)
             (m/mset! flame-length-matrix        i j flame-length)
