@@ -93,7 +93,7 @@
 
 (defn deltas-wind->coord
   "Converts deltas from the torched tree in the wind direction to deltas
-  in the coordinate plane "
+  in the coordinate plane"
   [deltas wind-direction]
   (map (fn [[d-paral d-perp]]
          (let [H  (hypotenuse d-paral d-perp)
