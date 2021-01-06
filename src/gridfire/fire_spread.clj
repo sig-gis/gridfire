@@ -177,10 +177,10 @@
           (get-neighbors here))))
 
 (defn burnable-neighbors?
-  ([fire-spread-matrix fuel-model-matrix num-rows num-cols cell]
-   (some #(and (in-bounds? num-rows num-cols %)
-               (burnable? fire-spread-matrix fuel-model-matrix cell %))
-         (get-neighbors cell))))
+  [fire-spread-matrix fuel-model-matrix num-rows num-cols cell]
+  (some #(and (in-bounds? num-rows num-cols %)
+              (burnable? fire-spread-matrix fuel-model-matrix cell %))
+        (get-neighbors cell)))
 
 (defn select-random-ignition-site
   [fuel-model-matrix]
