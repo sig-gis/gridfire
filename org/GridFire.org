@@ -2090,7 +2090,8 @@ pseudo-code lays out the steps taken in this procedure:
                                                                  ignition-event
                                                                  firebrand-count-matrix
                                                                  fire-spread-matrix
-                                                                 fire-line-intensity-matrix))]
+                                                                 fire-line-intensity-matrix
+                                                                 flame-length-matrix))]
                 (vreset! temp-spot-cells (merge-with (partial min-key first)
                                                      @temp-spot-cells spot-ignitions))))))
         (let [[spot-ignite-later ignited-cells] (update-spot-ignited-cells constants
@@ -2098,6 +2099,7 @@ pseudo-code lays out the steps taken in this procedure:
                                                                            temp-spot-cells
                                                                            spot-ignite-later
                                                                            fire-spread-matrix
+                                                                           burn-time-matrix
                                                                            ignited-cells)]
           (recur next-global-clock
                  (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix global-clock)

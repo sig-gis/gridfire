@@ -330,6 +330,7 @@
                                                                            temp-spot-cells
                                                                            spot-ignite-later
                                                                            fire-spread-matrix
+                                                                           burn-time-matrix
                                                                            ignited-cells)]
           (recur next-global-clock
                  (update-ignited-cells constants ignited-cells ignition-events fire-spread-matrix global-clock)
