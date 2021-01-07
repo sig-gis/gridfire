@@ -264,9 +264,14 @@
    global-clock
    {:keys [fire-spread-matrix burn-time-matrix]}
    spot-ignite-now]
-  (let [ignited-cells (generate-ignited-cells constants
-                                              fire-spread-matrix
-                                              (keys spot-ignite-now))]
+  (let [ignited?        (fn [[k v]]
+                          (let [[i j] k
+                                [_ p] v]
+                            (> (m/mget fire-spread-matrix i j) p)))
+        spot-ignite-now (remove ignited? spot-ignite-now)
+        ignited-cells   (generate-ignited-cells constants
+                                                fire-spread-matrix
+                                                (keys spot-ignite-now))]
     (doseq [cell spot-ignite-now
             :let [[i j] (key cell)]]
       (m/mset! fire-spread-matrix i j 1.0)
