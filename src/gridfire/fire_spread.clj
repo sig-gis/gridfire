@@ -235,7 +235,8 @@
                     (- fractional-distance 1.0)
                     global-clock)])))))
 
-(defn generate-ignited-cells [constants fire-spread-matrix cells]
+(defn generate-ignited-cells
+  [constants fire-spread-matrix cells]
   (when (seq cells)
     (into {}
           (for [cell cells]
@@ -257,10 +258,11 @@
     [ignite-later ignite-now]))
 
 (defn spot-ignited-cells
+  "Updates matrices for spot ignited cells
+  Returns a map of ignited cells"
   [constants
    global-clock
-   {:keys [fire-spread-matrix
-           burn-time-matrix]}
+   {:keys [fire-spread-matrix burn-time-matrix]}
    spot-ignite-now]
   (let [ignited-cells (generate-ignited-cells constants
                                               fire-spread-matrix
@@ -272,6 +274,9 @@
     ignited-cells))
 
 (defn new-spot-ignitions
+  "Returns a map of [x y] locations to [t p] where:
+  t: time of ignition
+  p: ignition-probability"
   [{:keys [spotting] :as config} constants matrices ignition-events]
   (when spotting
     (reduce (fn [acc ignition-event]

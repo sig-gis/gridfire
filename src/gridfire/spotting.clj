@@ -211,7 +211,9 @@
 (defn spread-firebrands
   "Returns a sequence of key value pairs where
   key: [x y] locations of the cell
-  val: [t p] where t = time of ignition and p = ignition-probability"
+  val: [t p] where:
+  t: time of ignition
+  p: ignition-probability"
   [{:keys
     [num-rows num-cols cell-size landfire-layers wind-speed-20ft
      wind-from-direction temperature relative-humidity
