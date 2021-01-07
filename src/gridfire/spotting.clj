@@ -124,14 +124,16 @@
     (> spot-ignition-probability random-number)))
 
 (defn spot-ignition-time
-  [global-clock flame-length-matrix [i j]]
+  [global-clock flame-length-matrix [i j] wind-speed-20ft]
   (let [a            5.963
         b            (- a 1.4)
         z-max        (* 0.39 0.003 (Math/pow 10 5))
-        flame-length (m/mget flame-length-matrix i j)
-        time-delta   (+ 1.2 (* (/ a 3.0)
-                               (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1)))]
-    (+ global-clock time-delta)))
+        flame-length (ft->m (m/mget flame-length-matrix i j))
+        time-delta   (+ (/ (* 2 flame-length) wind-speed-20ft)
+                        1.2
+                        (* (/ a 3.0)
+                           (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1)))]
+    (+ global-clock (/ time-delta 60))))
 
 ;;-----------------------------------------------------------------------------
 ;; Main
@@ -250,6 +252,10 @@
                                                                    cell
                                                                    [x y])]]
              (when (spot-ignition? rand-gen spot-ignition-p)
-               [[x y] [(spot-ignition-time global-clock flame-length-matrix cell) spot-ignition-p]]))
+               (let [t (spot-ignition-time global-clock
+                                           flame-length-matrix
+                                           cell
+                                           (convert/mph->mps wind-speed-20ft))]
+                [[x y] [t spot-ignition-p]])))
            (remove nil?)))))
 ;; Spotting Model Forumulas:1 ends here
