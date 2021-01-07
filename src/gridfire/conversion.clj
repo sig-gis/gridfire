@@ -44,3 +44,8 @@
 (defn dec->percent
   [d]
   (* d 100))
+
+(defn sec->min
+  "Convert seconds to minutes."
+  [s]
+  (/ s 60))

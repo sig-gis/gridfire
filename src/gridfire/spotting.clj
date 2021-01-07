@@ -124,16 +124,22 @@
     (> spot-ignition-probability random-number)))
 
 (defn spot-ignition-time
-  [global-clock flame-length-matrix [i j] wind-speed-20ft]
-  (let [a            5.963
-        b            (- a 1.4)
-        z-max        (* 0.39 0.003 (Math/pow 10 5))
-        flame-length (ft->m (m/mget flame-length-matrix i j))
-        time-delta   (+ (/ (* 2 flame-length) wind-speed-20ft)
-                        1.2
-                        (* (/ a 3.0)
-                           (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1)))]
-    (+ global-clock (/ time-delta 60))))
+  "Returns the time of spot ignition in minutes given:
+  global-clock: (min)
+  flame-length: (m)
+  wind-speed-20ft: (ms^-1)"
+  [global-clock flame-length wind-speed-20ft]
+  (let [a              5.963
+        b              (- a 1.4)
+        D              0.003 ;firebrand diaemeter (m)
+        z-max          (* 0.39 D (Math/pow 10 5))
+        t-steady-state 20    ;min
+        t-max-height   (convert/sec->min ;min
+                            (+ (/ (* 2 flame-length) wind-speed-20ft)
+                               1.2
+                               (* (/ a 3.0)
+                                  (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1))))]
+    (+ global-clock (* 2 t-max-height) 20)))
 
 ;;-----------------------------------------------------------------------------
 ;; Main
@@ -252,10 +258,10 @@
                                                                    cell
                                                                    [x y])]]
              (when (spot-ignition? rand-gen spot-ignition-p)
-               (let [t (spot-ignition-time global-clock
-                                           flame-length-matrix
-                                           cell
-                                           (convert/mph->mps wind-speed-20ft))]
-                [[x y] [t spot-ignition-p]])))
+               (let [[i j] cell
+                     t     (spot-ignition-time global-clock
+                                               (ft->m (m/mget flame-length-matrix i j))
+                                               (convert/mph->mps wind-speed-20ft))]
+                 [[x y] [t spot-ignition-p]])))
            (remove nil?)))))
 ;; Spotting Model Forumulas:1 ends here
