@@ -115,7 +115,7 @@
                                                  cell-size
                                                  here
                                                  torched-origin))
-        decay-factor         (Math/exp (* - 1 decay-constant distance))]
+        decay-factor         (Math/exp (* -1 decay-constant distance))]
     (- 1 (Math/pow (- 1 (* ignition-probability decay-factor)) firebrand-count))))
 
 (defn spot-ignition?
