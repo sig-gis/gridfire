@@ -217,11 +217,11 @@
      wind-from-direction temperature relative-humidity
      global-clock multiplier-lookup perturbations] :as constants}
    {:keys [spotting rand-gen random-seed] :as config}
-   {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}
-   firebrand-count-matrix
-   fire-spread-matrix
-   fire-line-intensity-matrix
-   flame-length-matrix]
+   {:keys [firebrand-count-matrix
+           fire-spread-matrix
+           fire-line-intensity-matrix
+           flame-length-matrix]}
+   {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}]
   (when crown-fire?
     (let [{:keys
            [wind-speed-20ft

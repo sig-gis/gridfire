@@ -259,9 +259,9 @@
 (defn spot-ignited-cells
   [constants
    global-clock
-   spot-ignite-now
-   fire-spread-matrix
-   burn-time-matrix]
+   {:keys [fire-spread-matrix
+           burn-time-matrix]}
+   spot-ignite-now]
   (let [ignited-cells (generate-ignited-cells constants
                                               fire-spread-matrix
                                               (keys spot-ignite-now))]
@@ -272,13 +272,7 @@
     ignited-cells))
 
 (defn new-spot-ignitions
-  [{:keys [spotting] :as config}
-   constants
-   ignition-events
-   firebrand-count-matrix
-   fire-spread-matrix
-   fire-line-intensity-matrix
-   flame-length-matrix]
+  [{:keys [spotting] :as config} constants matrices ignition-events]
   (when spotting
     (reduce (fn [acc ignition-event]
               (merge-with (partial min-key first)
@@ -286,11 +280,8 @@
                           (->> (spot/spread-firebrands
                                 constants
                                 config
-                                ignition-event
-                                firebrand-count-matrix
-                                fire-spread-matrix
-                                fire-line-intensity-matrix
-                                flame-length-matrix)
+                                matrices
+                                ignition-event)
                                (into {}))))
             {}
             ignition-events)))
@@ -299,12 +290,12 @@
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
    {:keys [spotting] :as config}
-   ignited-cells
-   fire-spread-matrix
-   flame-length-matrix
-   fire-line-intensity-matrix
-   firebrand-count-matrix
-   burn-time-matrix]
+   {:keys [fire-spread-matrix
+           flame-length-matrix
+           fire-line-intensity-matrix
+           firebrand-count-matrix
+           burn-time-matrix] :as matrices}
+   ignited-cells]
   (loop [global-clock      0.0
          ignited-cells     ignited-cells
          spot-ignitions {}]
@@ -332,11 +323,8 @@
             (m/mset! burn-time-matrix           i j global-clock)))
         (let [new-spot-ignitions (new-spot-ignitions config
                                                      (assoc constants :global-clock global-clock)
-                                                     ignition-events
-                                                     firebrand-count-matrix
-                                                     fire-spread-matrix
-                                                     flame-length-matrix
-                                                     fire-line-intensity-matrix)
+                                                     matrices
+                                                     ignition-events)
               [spot-ignite-later
                spot-ignite-now]  (identify-spot-ignition-events global-clock
                                                                 (merge-with (partial min-key first)
@@ -344,9 +332,8 @@
                                                                             new-spot-ignitions))
               spot-ignited-cells (spot-ignited-cells constants
                                                      global-clock
-                                                     spot-ignite-now
-                                                     fire-spread-matrix
-                                                     burn-time-matrix)]
+                                                     matrices
+                                                     spot-ignite-now)]
           (recur next-global-clock
                  (update-ignited-cells constants
                                        (merge spot-ignited-cells ignited-cells)
@@ -427,12 +414,12 @@
                    constants
                    {:initial-ignition-site initial-ignition-site})
                   config
-                  ignited-cells
-                  fire-spread-matrix
-                  flame-length-matrix
-                  fire-line-intensity-matrix
-                  firebrand-count-matrix
-                  burn-time-matrix)))))
+                  {:fire-spread-matrix         fire-spread-matrix
+                   :flame-length-matrix        flame-length-matrix
+                   :fire-line-intensity-matrix fire-line-intensity-matrix
+                   :firebrand-count-matrix     firebrand-count-matrix
+                   :burn-time-matrix           burn-time-matrix}
+                  ignited-cells)))))
 
 (defn- initialize-matrix
   [num-rows num-cols indices]
@@ -462,10 +449,10 @@
                constants
                {:initial-ignition-site initial-ignition-raster})
               config
-              ignited-cells
-              fire-spread-matrix
-              flame-length-matrix
-              fire-line-intensity-matrix
-              firebrand-count-matrix
-              burn-time-matrix)))
+              {:fire-spread-matrix         fire-spread-matrix
+               :flame-length-matrix        flame-length-matrix
+               :fire-line-intensity-matrix fire-line-intensity-matrix
+               :firebrand-count-matrix     firebrand-count-matrix
+               :burn-time-matrix           burn-time-matrix}
+              ignited-cells)))
 ;; fire-spread-algorithm ends here
