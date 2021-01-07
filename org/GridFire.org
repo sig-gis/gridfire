@@ -2554,7 +2554,6 @@ $t_I$ is also assumed to be 20 min as used in McAlpine and Wakimoto (1991).
                                   (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1))))]
     (+ global-clock (* 2 t-max-height) 20)))
 #+end_src
->>>>>>> add documentation for spotting model work
 
 Once the locations, ignition probabilities, and time of ignition has been
 calculated for each of the firebrands a sequence of key value pairs are
