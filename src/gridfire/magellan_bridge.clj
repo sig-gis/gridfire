@@ -29,7 +29,7 @@
         envelope (:envelope r-info)]
     {:srid       (:srid r-info)
      :upperleftx (get-in envelope [:x :min])
-     :upperlefty (get-in envelope [:y :min])
+     :upperlefty (get-in envelope [:y :max])
      :width      (:width image)
      :height     (:height image)
      :scalex     (.getScaleX (.getGridToCRS2D grid))
@@ -64,7 +64,7 @@
         envelope (:envelope r-info)]
     {:srid       (:srid r-info)
      :upperleftx (get-in envelope [:x :min])
-     :upperlefty (get-in envelope [:y :min])
+     :upperlefty (get-in envelope [:y :max])
      :width      (:width image)
      :height     (:height image)
      :scalex     (.getScaleX (.getGridToCRS2D grid))
