@@ -7,6 +7,6 @@
 (s/def ::num-firebrands int?)
 
 (s/def ::spotting
-  (common/one-or-more-keys [::ambient-gas-density
-                     ::specific-heat-gas
-                     ::num-firebrands]))
+  (s/keys :req-un [::ambient-gas-density
+                   ::specific-heat-gas
+                   ::num-firebrands]))
