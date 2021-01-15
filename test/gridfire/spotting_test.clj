@@ -67,3 +67,22 @@
           (is (close-to-zero dx))
 
           (is (= (- H) dy)))))))
+
+(deftest surface-spot-percents
+  (testing "expected ranges"
+   (let [spot-percents [[[1 140] 1.0]
+                        [[141 149] 2.0]
+                        [[150 256] 3.0]]]
+
+     (is (= 1.0 (spotting/surface-spot-percent spot-percents 5)))
+
+     (is (= 2.0 (spotting/surface-spot-percent spot-percents 143)))
+
+     (is (= 3.0 (spotting/surface-spot-percent spot-percents 155)))))
+
+  (testing "overlapping ranges"
+   (let [spot-percents [[[1 140] 1.0]
+                        [[130 149] 2.0]]]
+
+     (is (= 2.0 (spotting/surface-spot-percent spot-percents 133))
+         "should overwite percents of previous range in the sequence"))))

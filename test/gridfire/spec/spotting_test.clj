@@ -4,11 +4,22 @@
             [gridfire.spec.spotting :as spotting]))
 
 (deftest spotting-test
-  (let [config {:ambient-gas-density         1.0
-                :crown-fire-spotting-percent [0.1 0.8]
-                :num-firebrands              10
-                :specific-heat-gas           0.1}]
-    (is (s/valid? ::spotting/spotting config))))
+  (testing "required"
+   (let [config {:ambient-gas-density         1.0
+                 :crown-fire-spotting-percent [0.1 0.8]
+                 :num-firebrands              10
+                 :specific-heat-gas           0.1}]
+     (is (s/valid? ::spotting/spotting config))))
+
+  (testing "optional surface-fire-spotting"
+    (let [config {:ambient-gas-density         1.0
+                  :crown-fire-spotting-percent [0.1 0.8]
+                  :num-firebrands              10
+                  :specific-heat-gas           0.1
+                  :surface-fire-spotting       {:spotting-percent [[[1   149] 1.0]
+                                                                   [[150 169] 2.0]
+                                                                   [[169 204] 3.0]]}}]
+      (is (s/valid? ::spotting/spotting config)))))
 
 (deftest crown-fire-spotting-percent-test
   (testing "scalar"
@@ -43,9 +54,36 @@
         "edge of ranges can overlap"))
 
   (testing "invalid range"
+<<<<<<< HEAD
 
     (is (not (s/valid? ::spotting/num-firebrands {:lo 10 :hi 1 }))
         "lo should not be higher than hi")
 
     (is (not (s/valid? ::spotting/num-firebrands {:lo [1 3] :hi [2 3]}))
         "should not have overlapping ranges")))
+=======
+    (let [config {:lo 10
+                  :hi 1 }]
+      (is (not (s/valid? ::spotting/num-firebrands config))
+          "lo syhould not be higher than hi"))
+
+    (let [config {:lo [1 3]
+                  :hi [2 3]}]
+      (is (not (s/valid? ::spotting/num-firebrands config))
+          "should not have overlapping ranges"))))
+
+(deftest surface-fire-spotting-test
+  (testing "scalar percents"
+    (let [config [[[1   149] 1.0]
+                  [[150 169] 2.0]
+                  [[169 204] 3.0]]]
+
+      (is (s/valid? ::spotting/surface-fire-spotting-percent config))))
+
+  (testing "range percents"
+    (let [config [[[1   149] [1.0 2.0]]
+                  [[150 169] [3.0 4.0]]
+                  [[169 204] [0.2 0.4]]]]
+
+      (is (s/valid? ::spotting/surface-fire-spotting-percent config)))))
+>>>>>>> add surface fire spotting
