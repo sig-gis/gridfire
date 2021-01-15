@@ -51,12 +51,13 @@
 (s/def ::fuel-percent-pair (s/tuple ::fuel-number-range (s/or :scalar float?
                                                               :range (s/tuple float? float?))))
 
-
 (s/def ::spotting-percent
   (s/coll-of ::fuel-percent-pair :kind vector?))
 
+(s/def ::critical-fire-line-intensity float?)
+
 (s/def ::surface-fire-spotting
-  (s/keys :req-un [::spotting-percent]))
+  (s/keys :req-un [::spotting-percent ::critical-fire-line-intensity]))
 
 (s/def ::spotting
   (s/keys :req-un [::ambient-gas-density
