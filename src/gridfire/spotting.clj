@@ -248,12 +248,14 @@
   [[[1 140] 0.0]
   [[141 149] 1.0]
   [[150 256] 1.0]]"
-  [{:keys [spotting rand-gen]} {:keys [landfire-layers]} [i j]]
-  (let [fuel-range-percents (get-in spotting [:surface-fire-spotting :spotting-percent])
-        fuel-model-raster   (:fuel-model landfire-layers)
-        fuel-model-number   (int (m/mget fuel-model-raster i j))
-        spot-percent        (surface-spot-percent fuel-range-percents fuel-model-number)]
-    (>= spot-percent (random-float 0.0 1.0 rand-gen))))
+  [{:keys [spotting rand-gen]} {:keys [landfire-layers]} [i j] fire-line-intensity]
+  (let [{:keys [surface-fire-spotting]} spotting]
+    (when (> fire-line-intensity (:critical-fire-line-intensity surface-fire-spotting))
+      (let [fuel-range-percents (:spotting-percent surface-fire-spotting)
+            fuel-model-raster   (:fuel-model landfire-layers)
+            fuel-model-number   (int (m/mget fuel-model-raster i j))
+            spot-percent        (surface-spot-percent fuel-range-percents fuel-model-number)]
+        (>= spot-percent (random-float 0.0 1.0 rand-gen))))))
 
 (defn crown-spot-fire? [{:keys [spotting rand-gen]}]
   (when-let [spot-percent (:crown-fire-spotting-percent spotting)]
@@ -263,10 +265,10 @@
               spot-percent)]
       (>= p (random-float 0.0 1.0 rand-gen)))))
 
-(defn spot-fire? [config constants crown-fire? here]
+(defn spot-fire? [config constants crown-fire? here fire-line-intensity]
   (if crown-fire?
     (crown-spot-fire? config)
-    (surface-fire-spot-fire? config constants here)))
+    (surface-fire-spot-fire? config constants here fire-line-intensity)))
 
 (defn spread-firebrands
   "Returns a sequence of key value pairs where
@@ -284,7 +286,7 @@
            fire-line-intensity-matrix
            flame-length-matrix]}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}]
-  (when (spot-fire? config constants crown-fire? cell)
+  (when (spot-fire? config constants crown-fire? cell fire-line-intensity)
     (let [{:keys
            [wind-speed-20ft
             temperature
