@@ -166,6 +166,40 @@
              {:perturbations perturbations}))))
 
 ;;-----------------------------------------------------------------------------
+;; Spotting
+;;-----------------------------------------------------------------------------
+
+
+(defn extract-crown-fire-spotting-percent
+  [{:strs [CROWN_FIRE_SPOTTING_PERCENT_MIN CROWN_FIRE_SPOTTING_PERCENT_MAX
+           CROWN_FIRE_SPOTTING_PERCENT STOCHASTIC_SPOTTING]}]
+  (if STOCHASTIC_SPOTTING
+    [CROWN_FIRE_SPOTTING_PERCENT_MIN CROWN_FIRE_SPOTTING_PERCENT_MAX]
+    CROWN_FIRE_SPOTTING_PERCENT))
+
+(defn extract-num-firebrands
+  [{:strs [NEMBERS NEMBERS_MIN NEMBERS_MIN_LO NEMBERS_MIN_HI NEMBERS_MAX
+           NEMBERS_MAX_LO NEMBERS_MAX_HI STOCHASTIC_SPOTTING]}]
+
+  (if STOCHASTIC_SPOTTING
+    {:lo (if NEMBERS_MIN_LO [NEMBERS_MIN_LO NEMBERS_MIN_HI] NEMBERS_MIN)
+     :hi (if NEMBERS_MAX_LO [NEMBERS_MAX_LO NEMBERS_MAX_HI] NEMBERS_MAX)}
+    NEMBERS))
+
+(defn process-spotting
+  [{:strs [ENABLE_SPOTTING] :as data} _ config]
+  (if (ENABLE_SPOTTING)
+    (merge config {:spotting {:ambient-gas-density         1.1
+                              :crown-fire-spotting-percent (extract-crown-fire-spotting-percent data)
+                              :num-firebrands              (extract-num-firebrands data)
+                              :specific-heat-gas           1121.0
+                              :surface-fire-spotting       {:spotting-percent [[[1   149] 1.0]
+                                                                               [[150 169] 2.0]
+                                                                               [[169 204] 3.0]]}}})
+    config))
+
+
+;;-----------------------------------------------------------------------------
 ;; Main
 ;;-----------------------------------------------------------------------------
 
@@ -179,13 +213,14 @@
         :max-runtime               (sec->min SIMULATION_TSTOP)
         :simulations               NUM_ENSEMBLE_MEMBERS
         :random-seed               SEED
-        :foliar-moisture     FOLIAR_MOISTURE_CONTENT
+        :foliar-moisture           FOLIAR_MOISTURE_CONTENT
         :ellipse-adjustment-factor 1.0}
        (process-landfire-layers data options)
        (process-ignition data options)
        (process-weather data options)
        (process-output data options)
-       (process-perturbations data options)))
+       (process-perturbations data options)
+       (process-spotting data options)))
 
 (defn write-config [config-params]
   (let [file "gridfire.edn"]
