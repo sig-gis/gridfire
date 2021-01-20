@@ -7,7 +7,7 @@
                                      in-bounds?
                                      burnable?]]
             [gridfire.crown-fire :refer [ft->m]]
-            [gridfire.utils.random :refer [random-float]]
+            [gridfire.utils.random :refer [random-float my-rand-int-range]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
 
@@ -56,21 +56,30 @@
     (+ (* 1.47 (Math/pow fire-line-intensity 0.54) (Math/pow wind-speed-20ft -0.55)) 1.14)
     (- (* 1.32 (Math/pow fire-line-intensity 0.26) (Math/pow wind-speed-20ft 0.11)) 0.02)))
 
+(defn- sample-num-firebrands
+  [{:keys [num-firebrands]} rand-gen]
+  (if (map? num-firebrands)
+    (let [{:keys [lo hi]} num-firebrands
+          l               (if (vector? lo) (my-rand-int-range rand-gen lo) lo)
+          h               (if (vector? hi) (my-rand-int-range rand-gen hi) hi)]
+      (my-rand-int-range rand-gen [l h]))
+    num-firebrands))
+
 (defn sample-wind-dir-deltas
   "Returns a sequence of [x y] distances (meters) that firebrands land away
   from a torched cell at i j where:
   x: parallel to the wind
   y: perpendicular to the wind (positive values are to the right of wind direction)
   "
-  [{:keys [spotting random-seed] :as config}
+  [{:keys [spotting rand-gen random-seed] :as config}
    fire-line-intensity-matrix
    wind-speed-20ft
    temperature
    [i j]]
   (let [{:keys
-         [num-firebrands
-          ambient-gas-density
+         [ambient-gas-density
           specific-heat-gas]} spotting
+        num-firebrands        (sample-num-firebrands spotting rand-gen)
         intensity             (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
         froude                (froude-number intensity
                                              wind-speed-20ft
@@ -202,7 +211,6 @@
                                (* (/ a 3.0)
                                   (- (Math/pow (/ (+ b (/ z-max flame-length)) a) (/ 3.0 2.0)) 1))))]
     (+ global-clock (* 2 t-max-height) 20)))
-
 ;; firebrands-time-of-ignition ends here
 ;; [[file:../../org/GridFire.org::spread-firebrands][spread-firebrands]]
 (defn update-firebrand-counts!
@@ -245,7 +253,7 @@
            fire-line-intensity-matrix
            flame-length-matrix]}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}]
-  (when (spot-fire? config crown-fire?)
+  (when (spot-fire? config constants crown-fire? cell)
     (let [{:keys
            [wind-speed-20ft
             temperature

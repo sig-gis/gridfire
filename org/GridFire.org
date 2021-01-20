@@ -1772,27 +1772,24 @@ pseudo-code lays out the steps taken in this procedure:
 (ns gridfire.fire-spread
   (:require [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as mop]
-            [gridfire.common :refer [extract-constants
-                                     fuel-moisture
-                                     in-bounds?
-                                     burnable-fuel-model?
-                                     burnable?]]
+            [gridfire.common :refer [burnable-fuel-model?
+                                     burnable?
+                                     extract-constants
+                                     fuel-moisture in-bounds?]]
             [gridfire.crown-fire :refer [crown-fire-eccentricity
                                          crown-fire-line-intensity
-                                         cruz-crown-fire-spread
-                                         van-wagner-crown-fire-initiation?]]
-            [gridfire.fuel-models :refer [build-fuel-model moisturize]]
+                                         cruz-crown-fire-spread van-wagner-crown-fire-initiation?]]
+            [gridfire.fuel-models :refer [build-fuel-model
+                                          moisturize]]
+            [gridfire.perturbation :as perturbation]
+            [gridfire.spotting :as spot]
             [gridfire.surface-fire :refer [anderson-flame-depth
                                            byram-fire-line-intensity
                                            byram-flame-length
                                            rothermel-surface-fire-spread-any
                                            rothermel-surface-fire-spread-max
                                            rothermel-surface-fire-spread-no-wind-no-slope
-                                           wind-adjustment-factor]]
-            [gridfire.perturbation :as perturbation]
-            [gridfire.utils.random :refer [random-float]]
-            [mikera.vectorz.core :as v]
-            [gridfire.spotting :as spot]))
+                                           wind-adjustment-factor]]))
 
 (m/set-current-implementation :vectorz)
 
@@ -2318,7 +2315,7 @@ the direction perpendicular to the wind.
                                      in-bounds?
                                      burnable?]]
             [gridfire.crown-fire :refer [ft->m]]
-            [gridfire.utils.random :refer [random-float]]
+            [gridfire.utils.random :refer [random-float my-rand-int-range]]
             [gridfire.conversion :as convert]
             [kixi.stats.distribution :as distribution]))
 
@@ -2367,21 +2364,30 @@ the direction perpendicular to the wind.
     (+ (* 1.47 (Math/pow fire-line-intensity 0.54) (Math/pow wind-speed-20ft -0.55)) 1.14)
     (- (* 1.32 (Math/pow fire-line-intensity 0.26) (Math/pow wind-speed-20ft 0.11)) 0.02)))
 
+(defn- sample-num-firebrands
+  [{:keys [num-firebrands]} rand-gen]
+  (if (map? num-firebrands)
+    (let [{:keys [lo hi]} num-firebrands
+          l               (if (vector? lo) (my-rand-int-range rand-gen lo) lo)
+          h               (if (vector? hi) (my-rand-int-range rand-gen hi) hi)]
+      (my-rand-int-range rand-gen [l h]))
+    num-firebrands))
+
 (defn sample-wind-dir-deltas
   "Returns a sequence of [x y] distances (meters) that firebrands land away
   from a torched cell at i j where:
   x: parallel to the wind
   y: perpendicular to the wind (positive values are to the right of wind direction)
   "
-  [{:keys [spotting random-seed] :as config}
+  [{:keys [spotting rand-gen random-seed] :as config}
    fire-line-intensity-matrix
    wind-speed-20ft
    temperature
    [i j]]
   (let [{:keys
-         [num-firebrands
-          ambient-gas-density
+         [ambient-gas-density
           specific-heat-gas]} spotting
+        num-firebrands        (sample-num-firebrands spotting rand-gen)
         intensity             (convert/Btu-ft-s->kW-m (m/mget fire-line-intensity-matrix i j))
         froude                (froude-number intensity
                                              wind-speed-20ft
@@ -2602,7 +2608,7 @@ ignition probability.
            fire-line-intensity-matrix
            flame-length-matrix]}
    {:keys [cell fire-line-intensity crown-fire?] :as ignition-event}]
-  (when (spot-fire? config crown-fire?)
+  (when (spot-fire? config constants crown-fire? cell)
     (let [{:keys
            [wind-speed-20ft
             temperature
@@ -3450,6 +3456,11 @@ or false:
   [min-val max-val rand-generator]
   (let [range (- max-val min-val)]
     (+ min-val (my-rand rand-generator range))))
+
+(defn my-rand-int-range
+  [rand-generator [min-val max-val]]
+  (let [range (- max-val min-val)]
+    (+ min-val (int (my-rand rand-generator range)))))
 #+end_src
 
 * Configuration file
@@ -3856,7 +3867,7 @@ config file. The value is a map containg these required entries:
 #+begin_src clojure
 {:spotting {:ambient-gas-density 1.1     ;(kgm^-3)
             :specific-heat-gas   1121.0  ;(KJkg^-1 K^-1)
-            :num-firebrands      50
+            :num-firebrands      [10 50]
             :decay-constant      0.005
             :crown-fire-spotting-percent 0.5}}
 #+end_src

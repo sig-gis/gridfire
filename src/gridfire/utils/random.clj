@@ -22,4 +22,9 @@
   [min-val max-val rand-generator]
   (let [range (- max-val min-val)]
     (+ min-val (my-rand rand-generator range))))
+
+(defn my-rand-int-range
+  [rand-generator [min-val max-val]]
+  (let [range (- max-val min-val)]
+    (+ min-val (int (my-rand rand-generator range)))))
 ;; utils-random ends here
