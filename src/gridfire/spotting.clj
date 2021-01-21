@@ -227,7 +227,7 @@
                 (let [[lo hi] spot-percent]
                   (random-float lo hi rand-gen))
                 spot-percent)]
-           (>= p (random-float 0.0 1.0 rand-gen))))))
+        (>= p (random-float 0.0 1.0 rand-gen))))))
 
 (defn spread-firebrands
   "Returns a sequence of key value pairs where

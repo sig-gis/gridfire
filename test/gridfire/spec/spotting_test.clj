@@ -12,17 +12,11 @@
 
 (deftest crown-fire-spotting-percent-test
   (testing "scalar"
-    (let [config 0.1]
-
-      (is (s/valid? ::spotting/crown-fire-spotting-percent config))))
+    (is (s/valid? ::spotting/crown-fire-spotting-percent 0.1)))
 
   (testing "range"
-   (let [config [0.1 0.8]]
-
-     (is (s/valid? ::spotting/crown-fire-spotting-percent config))))
+    (is (s/valid? ::spotting/crown-fire-spotting-percent [0.1 0.8])))
 
   (testing "invalid range"
-    (let [config [0.8 0.1]]
-
-      (is (not (s/valid? ::spotting/crown-fire-spotting-percent config))
-          "first value is larger than the second"))))
+    (is (not (s/valid? ::spotting/crown-fire-spotting-percent [0.8 0.1]))
+        "first value should not be larger than the second")))
