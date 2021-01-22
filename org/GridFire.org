@@ -3889,20 +3889,30 @@ by setting `{:spatial-type :pixel}.
 Gridfire supports spot fires.
 To turn on spot ignitions include the key *spotting* at the top level of the
 config file. The value is a map containg these required entries:
+
 - *ambient-gas-density*: float
 - *specific-heat-gas*: float
 - *num-firebrands*: number of firebrands each torched tree will produce
 - *decay-constant*: positive number
-- *crown-fire-spotting-percent*: probability a crown fire ignition will spot fires.
+- *crown-fire-spotting-percent*: probability a crown fire ignition will spot fires
+
+You may also choose to include surface fire spotting. This behavior is
+controlled by including the following mappings under the `:spotting`
+configuration:
+
+- *surface-fire-spotting*: a vector of fuel range and percent pairs
+  where the fuel range is a tuple of integers representing the fuel model
+  numbers and the percent is the percentage of surface fire igntion
+  events that will spot fires.
 
 #+begin_src clojure
 {:spotting {:ambient-gas-density 1.1     ;(kgm^-3)
             :specific-heat-gas   1121.0  ;(KJkg^-1 K^-1)
             :num-firebrands      [10 50]
             :decay-constant      0.005
-            :crown-fire-spotting-percent 0.5}}
+            :crown-fire-spotting-percent 0.
+            :surface-fires-spotting [[1 100] 1.0]}}
 #+end_src
-
 
 * Example Configuration files
 
