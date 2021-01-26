@@ -250,7 +250,9 @@
   [[150 256] 1.0]]"
   [{:keys [spotting rand-gen]} {:keys [landfire-layers]} [i j] fire-line-intensity]
   (let [{:keys [surface-fire-spotting]} spotting]
-    (when (> fire-line-intensity (:critical-fire-line-intensity surface-fire-spotting))
+    (when (and
+           surface-fire-spotting
+           (> fire-line-intensity (:critical-fire-line-intensity surface-fire-spotting)))
       (let [fuel-range-percents (:spotting-percent surface-fire-spotting)
             fuel-model-raster   (:fuel-model landfire-layers)
             fuel-model-number   (int (m/mget fuel-model-raster i j))
