@@ -109,13 +109,14 @@
 ;;-----------------------------------------------------------------------------
 
 (defn process-output
-  [{:strs [CALCULATE_BURN_PROBABILITY DTDUMP DUMP_BURN_PROBABILITY_AT_DTDUMP]}
+  [{:strs [DTDUMP DUMP_BURN_PROBABILITY_AT_DTDUMP OUTPUTS_DIRECTORY]}
    {:keys [verbose]} config]
   (let [burn-probability (when DUMP_BURN_PROBABILITY_AT_DTDUMP
                            {:burn-probability (sec->min DTDUMP)})]
     (merge config
            burn-probability
-           {:outfile-suffix          ""
+           {:output-directory        (str elmfire-file-path (subs OUTPUTS_DIRECTORY 1))
+            :outfile-suffix          ""
             :output-landfire-inputs? false
             :output-geotiffs?        true
             :output-pngs?            (if verbose true false)

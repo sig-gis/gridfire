@@ -2,10 +2,9 @@
   (:require [clojure.spec.alpha :as s]
             [gridfire.spec.common :as common]))
 
-(defmacro one-or-more-keys [ks]
-  (let [keyset (set (map (comp keyword name) ks))]
-    `(s/and (s/keys :opt-un ~ks)
-            #(some ~keyset (keys %)))))
+(def file-path-regex #"^(((\.\.){1}/)*|(/){1})?(([\w-]*)/)*")
+
+(s/def ::file-path (s/and string? #(re-matches file-path-regex %)))
 
 (s/def ::type
   (s/or :key #{:final}
@@ -16,6 +15,7 @@
 (s/def ::fire-line-intensity ::type)
 (s/def ::burn-history ::type)
 (s/def ::output-burn-probability ::type)
+(s/def ::output-directory ::file-path)
 
 (s/def ::output-layers
   (common/one-or-more-keys
