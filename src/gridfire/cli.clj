@@ -205,6 +205,17 @@
        (str/join "_" $)
        (str $ ext)))
 
+(defn output-path
+  [output-directory name outfile-suffix simulation-id output-time ext]
+  (let [filename (output-filename name
+                                  outfile-suffix
+                                  (str simulation-id)
+                                  output-time
+                                  ext)]
+    (if output-directory
+      (str/join "/" [output-directory filename])
+      filename)))
+
 (defn output-geotiff
   ([config matrix name envelope]
    (output-geotiff config matrix name envelope nil nil))
@@ -212,15 +223,16 @@
   ([config matrix name envelope simulation-id]
    (output-geotiff config matrix name envelope simulation-id nil))
 
-  ([{:keys [output-geotiffs? outfile-suffix] :as config}
+  ([{:keys [output-geotiffs? outfile-suffix output-directory] :as config}
     matrix name envelope simulation-id output-time]
    (when output-geotiffs?
      (-> (matrix-to-raster name matrix envelope)
-         (write-raster (output-filename name
-                                        outfile-suffix
-                                        (str simulation-id)
-                                        output-time
-                                        ".tif"))))))
+         (write-raster (output-path output-directory
+                                    name
+                                    outfile-suffix
+                                    (str simulation-id)
+                                    output-time
+                                    ".tif"))))))
 
 (defn output-png
   ([config matrix name envelope]
@@ -229,16 +241,17 @@
   ([config matrix name envelope simulation-id]
    (output-png config matrix name envelope simulation-id nil))
 
-  ([{:keys [output-png? outfile-suffix] :as config}
+  ([{:keys [output-png? outfile-suffix output-directory] :as config}
     matrix name envelope simulation-id output-time]
    (when output-png?
      (save-matrix-as-png :color 4 -1.0
                          matrix
-                         (output-filename name
-                                          outfile-suffix
-                                          (str simulation-id)
-                                          output-time
-                                          ".png")))))
+                         (output-path output-directory
+                                      name
+                                      outfile-suffix
+                                      (str simulation-id)
+                                      output-time
+                                      ".png")))))
 
 (def layer-name->matrix
   [["fire_spread"         :fire-spread-matrix]
@@ -394,9 +407,11 @@
    (range simulations)))
 
 (defn write-csv-outputs
-  [output-csvs? output-filename results-table]
+  [output-directory output-csvs? output-filename results-table]
   (when output-csvs?
-    (with-open [out-file (io/writer output-filename)]
+    (with-open [out-file (io/writer (when output-directory
+                                      (str/join "/" [output-directory output-filename])
+                                      output-filename))]
       (->> results-table
            (sort-by #(vector (:ignition-row %) (:ignition-col %)))
            (mapv (fn [{:keys [ignition-row ignition-col max-runtime temperature relative-humidity wind-speed-20ft
@@ -498,6 +513,7 @@
                 (perturbation/draw-samples rand-generator simulations (:perturbations config))
                 burn-count-matrix)
                (write-csv-outputs
+                (:output-directory config)
                 (:output-csvs? config)
                 (str "summary_stats" (:outfile-suffix config) ".csv")))
           (output-burn-probability-layer! config envelope burn-count-matrix))

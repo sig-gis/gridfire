@@ -102,6 +102,7 @@
              ::ignition/ignition-layer
              ::output/output-layers
              ::output/output-burn-probability
+             ::output/output-directory
              ::spotting/spotting])
    ::weather-layers
    #(valid-weather-cell-sizes? %)
