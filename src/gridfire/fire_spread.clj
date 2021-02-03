@@ -81,7 +81,8 @@
 (defn compute-burn-trajectory
   [neighbor here spread-info-min spread-info-max fuel-model crown-bulk-density
    canopy-cover canopy-height canopy-base-height foliar-moisture crown-spread-max
-   crown-eccentricity landfire-layers cell-size overflow-trajectory overflow-heat]
+   crown-eccentricity landfire-layers cell-size overflow-trajectory overflow-heat
+   crown-type]
   (let [trajectory          (mop/- neighbor here)
         spread-direction    (offset-to-degrees trajectory)
         surface-spread-rate (rothermel-surface-fire-spread-any spread-info-max
@@ -123,6 +124,7 @@
      :fractional-distance (volatile! (if (= trajectory overflow-trajectory)
                                        overflow-heat
                                        0.0))
+     :fire-type           (if crown-fire? crown-type :surface)
      :crown-fire?         crown-fire?}))
 
 (defn compute-neighborhood-fire-spread-rates!
@@ -146,22 +148,21 @@
           slope
           temperature
           wind-from-direction
-          wind-speed-20ft]}          (extract-constants constants global-clock here)
-        fuel-moisture                (fuel-moisture relative-humidity temperature)
-        [fuel-model spread-info-min] (rothermel-fast-wrapper fuel-model fuel-moisture)
-        midflame-wind-speed          (* wind-speed-20ft 88.0
-                                        (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
-        spread-info-max              (rothermel-surface-fire-spread-max spread-info-min
-                                                                        midflame-wind-speed
-                                                                        wind-from-direction
-                                                                        slope
-                                                                        aspect
-                                                                        ellipse-adjustment-factor)
-        crown-spread-max             (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
-                                                             (-> fuel-moisture :dead :1hr))
-        crown-eccentricity           (crown-fire-eccentricity wind-speed-20ft
-                                                              ellipse-adjustment-factor)
-        ignition-probability         (m/mget fire-spread-matrix i j)]
+          wind-speed-20ft]}           (extract-constants constants global-clock here)
+        fuel-moisture                 (fuel-moisture relative-humidity temperature)
+        [fuel-model spread-info-min]  (rothermel-fast-wrapper fuel-model fuel-moisture)
+        midflame-wind-speed           (* wind-speed-20ft 88.0 (wind-adjustment-factor (:delta fuel-model) canopy-height canopy-cover)) ; mi/hr -> ft/min
+        spread-info-max               (rothermel-surface-fire-spread-max spread-info-min
+                                                                         midflame-wind-speed
+                                                                         wind-from-direction
+                                                                         slope
+                                                                         aspect
+                                                                         ellipse-adjustment-factor)
+        [crown-type crown-spread-max] (cruz-crown-fire-spread wind-speed-20ft crown-bulk-density
+                                                              (-> fuel-moisture :dead :1hr))
+        crown-eccentricity            (crown-fire-eccentricity wind-speed-20ft
+                                                               ellipse-adjustment-factor)
+        ignition-probability          (m/mget fire-spread-matrix i j)]
     (into []
           (comp
            (filter #(and (in-bounds? num-rows num-cols %)
@@ -170,7 +171,7 @@
                                           crown-bulk-density canopy-cover canopy-height
                                           canopy-base-height foliar-moisture crown-spread-max
                                           crown-eccentricity landfire-layers cell-size
-                                          overflow-trajectory overflow-heat)))
+                                          overflow-trajectory overflow-heat crown-type)))
           (get-neighbors here))))
 
 (defn burnable-neighbors?
@@ -201,7 +202,8 @@
                      flame-length
                      fire-line-intensity
                      fractional-distance
-                     crown-fire?]} destinations]
+                     crown-fire?
+                     fire-type]} destinations]
          (let [[i j]               source
                new-spread-fraction (/ (* spread-rate timestep) terrain-distance)
                new-total           (vreset! fractional-distance
@@ -214,6 +216,7 @@
               :fire-line-intensity  fire-line-intensity
               :spread-rate          spread-rate
               :crown-fire?          crown-fire?
+              :fire-type            fire-type
               :ignition-probability (m/mget fire-spread-matrix i j)})))
        (remove nil?)
        (group-by :cell)
@@ -315,6 +318,10 @@
             {}
             ignition-events)))
 
+(def fire-type-to-value
+  {:surface       1.0
+   :passive-crown 2.0
+   :active-crown  3.0})
 
 (defn run-loop
   [{:keys [max-runtime cell-size initial-ignition-site multiplier-lookup] :as constants}
@@ -324,7 +331,8 @@
            fire-line-intensity-matrix
            firebrand-count-matrix
            burn-time-matrix
-           spread-rate-matrix] :as matrices}
+           spread-rate-matrix
+           fire-type-matrix] :as matrices}
    ignited-cells]
   (loop [global-clock      0.0
          ignited-cells     ignited-cells
@@ -346,13 +354,14 @@
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
         (doseq [{:keys [cell flame-length fire-line-intensity
-                        ignition-probability spread-rate] :as ignition-event} ignition-events]
+                        ignition-probability spread-rate fire-type] :as ignition-event} ignition-events]
           (let [[i j] cell]
             (m/mset! fire-spread-matrix         i j ignition-probability)
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
             (m/mset! burn-time-matrix           i j global-clock)
-            (m/mset! spread-rate-matrix         i j spread-rate)))
+            (m/mset! spread-rate-matrix         i j spread-rate)
+            (m/mset! fire-type-matrix           i j (fire-type fire-type-to-value))))
         (let [new-spot-ignitions (new-spot-ignitions config
                                                      (assoc constants :global-clock global-clock)
                                                      matrices
@@ -380,7 +389,8 @@
        :flame-length-matrix        flame-length-matrix
        :fire-line-intensity-matrix fire-line-intensity-matrix
        :burn-time-matrix           burn-time-matrix
-       :spread-rate-matrix         spread-rate-matrix})))
+       :spread-rate-matrix         spread-rate-matrix
+       :fire-type-matrix           fire-type-matrix})))
 
 (defmulti run-fire-spread
   "Runs the raster-based fire spread model with a map of these arguments:
@@ -427,7 +437,8 @@
         fire-line-intensity-matrix (m/zero-matrix num-rows num-cols)
         burn-time-matrix           (m/zero-matrix num-rows num-cols)
         firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))
-        spread-rate-matrix         (m/zero-matrix num-rows num-cols)]
+        spread-rate-matrix         (m/zero-matrix num-rows num-cols)
+        fire-type-matrix           (m/zero-matrix num-rows num-cols)]
     (when (and (in-bounds? num-rows num-cols initial-ignition-site)
                (burnable-fuel-model? (m/mget fuel-model-matrix i j))
                (burnable-neighbors? fire-spread-matrix fuel-model-matrix
@@ -453,7 +464,8 @@
                    :flame-length-matrix        flame-length-matrix
                    :fire-line-intensity-matrix fire-line-intensity-matrix
                    :firebrand-count-matrix     firebrand-count-matrix
-                   :burn-time-matrix           burn-time-matrix}
+                   :burn-time-matrix           burn-time-matrix
+                   :fire-type-matrix           fire-type-matrix}
                   ignited-cells)))))
 
 (defn- initialize-matrix
@@ -480,6 +492,7 @@
         burn-time-matrix           (initialize-matrix num-rows num-cols non-zero-indices)
         firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))
         spread-rate-matrix         (initialize-matrix num-rows num-cols non-zero-indices)
+        fire-type-matrix           (initialize-matrix num-rows num-cols non-zero-indices)
         ignited-cells              (generate-ignited-cells constants fire-spread-matrix non-zero-indices)]
     (run-loop (merge
                constants
@@ -490,6 +503,7 @@
                :flame-length-matrix        flame-length-matrix
                :fire-line-intensity-matrix fire-line-intensity-matrix
                :firebrand-count-matrix     firebrand-count-matrix
-               :burn-time-matrix           burn-time-matrix}
+               :burn-time-matrix           burn-time-matrix
+               :fire-type-matrix           fire-type-matrix}
               ignited-cells)))
 ;; fire-spread-algorithm ends here

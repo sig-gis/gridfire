@@ -42,10 +42,9 @@
                                         ;; m/min
         critical-spread-rate         (/ 3.0 crown-bulk-density) ;; m/min
         criteria-for-active-crowning (/ active-spread-rate critical-spread-rate)]
-    (m->ft
-     (if (> active-spread-rate critical-spread-rate)
-       active-spread-rate
-       (* active-spread-rate (Math/exp (- criteria-for-active-crowning)))))))
+    (if (> active-spread-rate critical-spread-rate)
+      [:active-crown (m->ft active-spread-rate)]
+      [:passive-crown (m->ft (* active-spread-rate (Math/exp (- criteria-for-active-crowning))))])))
 ;; cruz-crown-fire-spread ends here
 
 ;; [[file:../../org/GridFire.org::crown-fire-line-intensity][crown-fire-line-intensity]]
