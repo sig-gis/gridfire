@@ -54,14 +54,6 @@
         "edge of ranges can overlap"))
 
   (testing "invalid range"
-<<<<<<< HEAD
-
-    (is (not (s/valid? ::spotting/num-firebrands {:lo 10 :hi 1 }))
-        "lo should not be higher than hi")
-
-    (is (not (s/valid? ::spotting/num-firebrands {:lo [1 3] :hi [2 3]}))
-        "should not have overlapping ranges")))
-=======
     (let [config {:lo 10
                   :hi 1 }]
       (is (not (s/valid? ::spotting/num-firebrands config))
@@ -86,4 +78,3 @@
                   [[169 204] [0.2 0.4]]]]
 
       (is (s/valid? ::spotting/surface-fire-spotting-percent config)))))
->>>>>>> add surface fire spotting
