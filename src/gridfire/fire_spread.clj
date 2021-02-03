@@ -212,6 +212,7 @@
               :fractional-distance  @fractional-distance
               :flame-length         flame-length
               :fire-line-intensity  fire-line-intensity
+              :spread-rate          spread-rate
               :crown-fire?          crown-fire?
               :ignition-probability (m/mget fire-spread-matrix i j)})))
        (remove nil?)
@@ -322,7 +323,8 @@
            flame-length-matrix
            fire-line-intensity-matrix
            firebrand-count-matrix
-           burn-time-matrix] :as matrices}
+           burn-time-matrix
+           spread-rate-matrix] :as matrices}
    ignited-cells]
   (loop [global-clock      0.0
          ignited-cells     ignited-cells
@@ -344,12 +346,13 @@
         ;; [{:cell :trajectory :fractional-distance
         ;;   :flame-length :fire-line-intensity} ...]
         (doseq [{:keys [cell flame-length fire-line-intensity
-                        ignition-probability] :as ignition-event} ignition-events]
+                        ignition-probability spread-rate] :as ignition-event} ignition-events]
           (let [[i j] cell]
             (m/mset! fire-spread-matrix         i j ignition-probability)
             (m/mset! flame-length-matrix        i j flame-length)
             (m/mset! fire-line-intensity-matrix i j fire-line-intensity)
-            (m/mset! burn-time-matrix           i j global-clock)))
+            (m/mset! burn-time-matrix           i j global-clock)
+            (m/mset! spread-rate-matrix         i j spread-rate)))
         (let [new-spot-ignitions (new-spot-ignitions config
                                                      (assoc constants :global-clock global-clock)
                                                      matrices
@@ -376,7 +379,8 @@
        :fire-spread-matrix         fire-spread-matrix
        :flame-length-matrix        flame-length-matrix
        :fire-line-intensity-matrix fire-line-intensity-matrix
-       :burn-time-matrix           burn-time-matrix})))
+       :burn-time-matrix           burn-time-matrix
+       :spread-rate-matrix         spread-rate-matrix})))
 
 (defmulti run-fire-spread
   "Runs the raster-based fire spread model with a map of these arguments:
@@ -422,7 +426,8 @@
         flame-length-matrix        (m/zero-matrix num-rows num-cols)
         fire-line-intensity-matrix (m/zero-matrix num-rows num-cols)
         burn-time-matrix           (m/zero-matrix num-rows num-cols)
-        firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))]
+        firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))
+        spread-rate-matrix         (m/zero-matrix num-rows num-cols)]
     (when (and (in-bounds? num-rows num-cols initial-ignition-site)
                (burnable-fuel-model? (m/mget fuel-model-matrix i j))
                (burnable-neighbors? fire-spread-matrix fuel-model-matrix
@@ -444,6 +449,7 @@
                    {:initial-ignition-site initial-ignition-site})
                   config
                   {:fire-spread-matrix         fire-spread-matrix
+                   :spread-rate-matrix         spread-rate-matrix
                    :flame-length-matrix        flame-length-matrix
                    :fire-line-intensity-matrix fire-line-intensity-matrix
                    :firebrand-count-matrix     firebrand-count-matrix
@@ -473,12 +479,14 @@
         fire-line-intensity-matrix (initialize-matrix num-rows num-cols non-zero-indices)
         burn-time-matrix           (initialize-matrix num-rows num-cols non-zero-indices)
         firebrand-count-matrix     (when spotting (m/zero-matrix num-rows num-cols))
+        spread-rate-matrix         (initialize-matrix num-rows num-cols non-zero-indices)
         ignited-cells              (generate-ignited-cells constants fire-spread-matrix non-zero-indices)]
     (run-loop (merge
                constants
                {:initial-ignition-site initial-ignition-raster})
               config
               {:fire-spread-matrix         fire-spread-matrix
+               :spread-rate-matrix         spread-rate-matrix
                :flame-length-matrix        flame-length-matrix
                :fire-line-intensity-matrix fire-line-intensity-matrix
                :firebrand-count-matrix     firebrand-count-matrix

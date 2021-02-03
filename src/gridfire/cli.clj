@@ -257,7 +257,8 @@
   [["fire_spread"         :fire-spread-matrix]
    ["flame_length"        :flame-length-matrix]
    ["fire_line_intensity" :fire-line-intensity-matrix]
-   ["burn_history"        :burn-time-matrix]])
+   ["burn_history"        :burn-time-matrix]
+   ["spread_rate"         :spread-rate-matrix]])
 
 (defn filter-output-layers [output-layers]
   (let [layers-to-filter (set (map (comp kebab->snake name) (keys output-layers)))]
