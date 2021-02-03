@@ -2,7 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [gridfire.spec.common :as common]))
 
-(def file-path-regex #"^(((\.\.){1}/)*|(/){1})?(([\w-]*)/)*")
+(def file-path-regex #"^(((\.\.){1}/)*|(/){1})?(([\w-]*)/)*([\w-]+)$")
 
 (s/def ::file-path (s/and string? #(re-matches file-path-regex %)))
 
