@@ -22,16 +22,16 @@
     (is (= (m/matrix matrix) (binary/read-matrix-as-binary binary-file)))))
 
 (deftest write-matrices-as-binary-test
-  (let [matrices {:burn-time-matrix    [[0.0 1.0 2.0] [3.0 0.0 4.0] [5.0 6.0 0.0]]
-                  :flame-length-matrix [[0.0 1.0 1.0] [1.0 0.0 1.0] [1.0 1.0 0.0]]
-                  :spread-rate-matrix  [[0.0 2.0 2.0] [2.0 0.0 2.0] [2.0 2.0 0.0]]
-                  :fire-type-matrix    [[0.0 3.0 3.0] [3.0 0.0 3.0] [3.0 3.0 0.0]]}
-        _        (binary/write-matrices-as-binary (vals matrices) binary-file)
-        result   (binary/read-matrices-as-binary binary-file (count (keys matrices)))]
-    (is (= (m/matrix (:burn-time-matrix matrices)) (first result)))
+  (let [matrices [[[0.0 1.0 2.0] [3.0 0.0 4.0] [5.0 6.0 0.0]]
+                  [[0.0 1.0 1.0] [1.0 0.0 1.0] [1.0 1.0 0.0]]
+                  [[0.0 2.0 2.0] [2.0 0.0 2.0] [2.0 2.0 0.0]]
+                  [[0 3 3] [3 0 3 ] [3 3 0]]]
+        _        (binary/write-matrices-as-binary matrices binary-file)
+        result   (binary/read-matrices-as-binary binary-file [:float :float :float :int])]
+    (is (= (first matrices) (first result)))
 
-    (is (= (m/matrix (:flame-length-matrix matrices)) (second result)))
+    (is (= (second matrices) (second result)))
 
-    (is (= (m/matrix (:spread-rate-matrix matrices)) (nth result 2)))
+    (is (= (nth matrices 2) (nth result 2)))
 
-    (is (= (m/matrix (:fire-type-matrix matrices)) (nth result 3)))))
+    (is (= (nth matrices 3) (nth result 3)))))
