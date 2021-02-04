@@ -1,10 +1,12 @@
 (ns gridfire.cli-test
   (:require [clojure.core.matrix :as m]
-            [clojure.test :refer [deftest is testing]]
+            [clojure.test :refer [deftest is testing use-fixtures]]
             [gridfire.cli :as cli]
             [gridfire.crown-fire :refer [m->ft]]
             [gridfire.fetch :as fetch]
-            [gridfire.perturbation :as perturbation])
+            [gridfire.utils.test :as utils]
+            [gridfire.perturbation :as perturbation]
+            [gridfire.binary-output :as binary])
   (:import java.util.Random))
 
 ;;-----------------------------------------------------------------------------
@@ -82,6 +84,12 @@
      multiplier-lookup
      (perturbation/draw-samples rand-generator simulations (:perturbations config))
      burn-count-matrix)))
+
+;;-----------------------------------------------------------------------------
+;; Fixtures
+;;-----------------------------------------------------------------------------
+
+(use-fixtures :once utils/with-temp-output-dir)
 
 ;;-----------------------------------------------------------------------------
 ;; Tests
@@ -329,3 +337,24 @@
                                                           :range        [-1.0 1.0]}}})
           results (run-simulation config)]
       (is (every? some? results)))))
+
+;;-----------------------------------------------------------------------------
+;; Outputs
+;;-----------------------------------------------------------------------------
+
+(deftest binary-output-files-test
+  (let [config         (merge test-config-base
+                              {:landfire-layers    {:aspect             "landfire.asp WHERE rid=1"
+                                                    :canopy-base-height "landfire.cbh WHERE rid=1"
+                                                    :canopy-cover       "landfire.cc WHERE rid=1"
+                                                    :canopy-height      "landfire.ch WHERE rid=1"
+                                                    :crown-bulk-density "landfire.cbd WHERE rid=1"
+                                                    :elevation          "landfire.dem WHERE rid=1"
+                                                    :fuel-model         "landfire.fbfm40 WHERE rid=1"
+                                                    :slope              "landfire.slp WHERE rid=1"}
+                               :output-binary?     true
+                               :output-directory   "test/output"
+                               :fetch-layer-method :postgis})
+        _              (run-simulation config)
+        binary-results (binary/read-matrices-as-binary (utils/out-file-path "simulation_0.bin") 4)]
+    (is (some? binary-results))))
