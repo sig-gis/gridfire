@@ -44,22 +44,26 @@
       (doseq [y (burned-data :y)] (.writeInt out (int y)))            ; Int32
       (doseq [v (burned-data :value)] (.writeFloat out (float v)))))) ; Float32
 
-(defn write-val [out v]
-  (if (= (type v) java.lang.Double)
-    (.writeFloat out (float v))
-    (.writeInt out (int v))))
+(defn- write-val [out type v]
+  (case type
+    :float (.writeFloat out (float v))
+    :int   (.writeInt out (int v))
+    nil))
 
 (defn write-matrices-as-binary
   [matrices file-name]
-  (let [num-burned-cells (m/non-zero-count (first matrices))
-        data             (map non-zero-data matrices)]
+  (let [num-burned-cells (m/non-zero-count (:matrix (first matrices)))
+        data             (map (fn [{:keys [ttype matrix]}]
+                                {:ttype ttype
+                                 :data  (non-zero-data matrix)})
+                              matrices)]
     (with-open [out (DataOutputStream. (io/output-stream file-name))]
       (.writeInt out (int num-burned-cells))                   ; Int32
-      (doseq [x ((first data) :x)] (.writeInt out (int x)))    ; Int32
-      (doseq [y ((first data) :y)] (.writeInt out (int y)))    ; Int32
+      (doseq [x ((:data (first data)) :x)] (.writeInt out (int x)))    ; Int32
+      (doseq [y ((:data (first data)) :y)] (.writeInt out (int y)))    ; Int32
       (doseq [d data
-              v (d :value)]
-        (write-val out v)))))                                  ;Float32/Int32
+              v (get-in d [:data :value])]
+        (write-val out (:ttype d) v)))))
 
 (defn read-matrix-as-binary [file-name]
   (with-open [in (DataInputStream. (io/input-stream file-name))]
