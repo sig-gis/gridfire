@@ -356,5 +356,6 @@
                                :output-directory   "test/output"
                                :fetch-layer-method :postgis})
         _              (run-simulation config)
-        binary-results (binary/read-matrices-as-binary (utils/out-file-path "simulation_0.bin") 4)]
+        binary-results (binary/read-matrices-as-binary (utils/out-file-path "simulation_0.bin")
+                                                       [:float :float :float :int])]
     (is (some? binary-results))))
