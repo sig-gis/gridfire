@@ -38,6 +38,18 @@
       (doseq [y (burned-data :y)] (.writeInt out (int y)))            ; Int32
       (doseq [v (burned-data :value)] (.writeFloat out (float v)))))) ; Float32
 
+(defn write-matrices-as-binary
+  [matrices file-name]
+  (let [num-burned-cells (m/non-zero-count (first matrices))
+        data             (map non-zero-data matrices)]
+    (with-open [out (DataOutputStream. (io/output-stream file-name))]
+      (.writeInt out (int num-burned-cells))                   ; Int32
+      (doseq [x ((first data) :x)] (.writeInt out (int x)))    ; Int32
+      (doseq [y ((first data) :y)] (.writeInt out (int y)))    ; Int32
+      (doseq [d data
+              v (d :value)]
+        (.writeFloat out (float v)))))) ;Float32
+
 (defn read-matrix-as-binary [file-name]
   (with-open [in (DataInputStream. (io/input-stream file-name))]
     (let [num-burned-cells (.readInt in)]                                ; Int32
@@ -45,6 +57,18 @@
        {:x     (vec (repeatedly num-burned-cells #(.readInt in)))        ; Int32
         :y     (vec (repeatedly num-burned-cells #(.readInt in)))        ; Int32
         :value (vec (repeatedly num-burned-cells #(.readFloat in)))})))) ; Float32
+
+(defn read-matrices-as-binary [file-name num-matrices]
+  (with-open [in (DataInputStream. (io/input-stream file-name))]
+    (let [num-burned-cells (.readInt in)
+          xs               (vec (repeatedly num-burned-cells #(.readInt in)))  ; Int32
+          ys               (vec (repeatedly num-burned-cells #(.readInt in)))] ; Int32
+      (mapv (fn [_]
+              (indices-to-matrix
+               {:x     xs
+                :y     ys
+                :value (vec (repeatedly num-burned-cells #(.readFloat in)))})) ; Float32
+            (range num-matrices)))))
 
 (defn write-two-int-file [file-name]
   (with-open [out (DataOutputStream. (io/output-stream file-name))]
