@@ -340,15 +340,19 @@
        (m/zero-array [num-bands num-rows num-cols]))
      (m/zero-array [num-rows num-cols]))))
 
-(defn process-binary-outputs!
+(defn process-binary-output!
   [{:keys [output-binary? output-directory]}
    {:keys [burn-time-matrix flame-length-matrix spread-rate-matrix fire-type-matrix]} simulation]
   (when output-binary?
     (let [output-name (str "simulation_" simulation ".bin")]
-      (binary/write-matrices-as-binary [burn-time-matrix
-                                        flame-length-matrix
-                                        spread-rate-matrix
-                                        fire-type-matrix]
+      (binary/write-matrices-as-binary [{:ttype  :float
+                                         :matrix burn-time-matrix}
+                                        {:ttype  :float
+                                         :matrix flame-length-matrix}
+                                        {:ttype  :float
+                                         :matrix spread-rate-matrix}
+                                        {:ttype  :int
+                                         :matrix fire-type-matrix}]
                                        (if output-directory
                                          (str/join "/" [output-directory output-name])
                                          output-name)))))
@@ -391,7 +395,7 @@
            (process-output-layers! config fire-spread-results envelope i)
            (when-let [timestep output-burn-probability]
              (process-burn-count! fire-spread-results burn-count-matrix timestep))
-           (process-binary-outputs! config fire-spread-results i)
+           (process-binary-output! config fire-spread-results i)
            (if output-csvs?
              (merge
               {:ignition-row              (ignition-row i)

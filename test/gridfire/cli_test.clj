@@ -358,4 +358,5 @@
         _              (run-simulation config)
         binary-results (binary/read-matrices-as-binary (utils/out-file-path "simulation_0.bin")
                                                        [:float :float :float :int])]
+    (prn binary-results)
     (is (some? binary-results))))
