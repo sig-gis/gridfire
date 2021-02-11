@@ -114,7 +114,8 @@
 ;;-----------------------------------------------------------------------------
 
 (defn process-output
-  [{:strs [CALCULATE_BURN_PROBABILITY DTDUMP DUMP_BURN_PROBABILITY_AT_DTDUMP]}
+  [{:strs [CALCULATE_BURN_PROBABILITY DTDUMP DUMP_BURN_PROBABILITY_AT_DTDUMP
+           OUTPUTS_DIRECTORY]}
    {:keys [verbose]} config]
   (let [burn-probability (when DUMP_BURN_PROBABILITY_AT_DTDUMP
                            {:burn-probability (sec->min DTDUMP)})]
@@ -124,6 +125,7 @@
             :output-landfire-inputs? false
             :output-geotiffs?        true
             :output-binary?          true
+            :output-directory        (str elmfire-file-path (subs OUTPUTS_DIRECTORY 1))
             :output-pngs?            (if verbose true false)
             :output-csvs?            true})))
 
@@ -258,15 +260,16 @@
          (process-spotting data options))))
 
 (defn write-config [config-params]
-  (let [file "gridfire.edn"]
-    (println "Config file:" file)
-    (spit file (with-out-str (pprint/pprint config-params)))))
+  (let [file-name "gridfire.edn"]
+    (println "Created Config file:" file-name)
+    (println "Directory:" elmfire-file-path)
+    (spit (str/join "/" [elmfire-file-path file-name])
+          (with-out-str (pprint/pprint config-params)))))
 
 (defn process-options
   [{:keys [config-file verbose] :as options}]
-  (binding [elmfire-file-path (str/replace config-file #"/elmfire.data" "")]
-    (let [data (parse (slurp config-file))]
-      (build-edn data options))))
+  (let [data (parse (slurp config-file))]
+    (build-edn data options)))
 
 (def cli-options
   [["-c" "--config-file FILE" "Path to an data file containing a map of simulation configs"]
@@ -282,4 +285,5 @@
           (run! println errors)
           (newline))
         (println (str "Usage:\n" summary)))
-      (write-config (process-options options)))))
+      (binding [elmfire-file-path (str/replace (:config-file options) #"/elmfire.data" "")]
+       (write-config (process-options options))))))
