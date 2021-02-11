@@ -272,7 +272,7 @@
 (defn process-binary-output!
   [{:keys [output-binary output-directory]}
    {:keys [burn-time-matrix flame-length-matrix spread-rate-matrix fire-type-matrix]} simulation]
-  (when output-binary?
+  (when output-binary
     (let [output-name (format "toa_0001_%05d.bin" (inc simulation))]
       (binary/write-matrices-as-binary [{:ttype  :float
                                          :matrix burn-time-matrix}
