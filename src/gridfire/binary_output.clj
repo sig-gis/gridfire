@@ -61,8 +61,8 @@
                               matrices)]
     (with-open [out (DataOutputStream. (io/output-stream file-name))]
       (.writeInt out (int num-burned-cells))                   ; Int32
-      (doseq [x ((:data (first data)) :x)] (.writeInt out (int x)))    ; Int32
-      (doseq [y ((:data (first data)) :y)] (.writeInt out (int y)))    ; Int32
+      (doseq [x (get-in (first data) [:data :x])] (.writeInt out (int x)))    ; Int32
+      (doseq [y (get-in (first data) [:data :y])] (.writeInt out (int y)))    ; Int32
       (doseq [d data
               v (get-in d [:data :value])]
         (write-val out (:ttype d) v)))))

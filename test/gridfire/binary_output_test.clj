@@ -32,10 +32,10 @@
                    :matrix [[0 3 3] [3 0 3] [3 3 0]]}]
         _        (binary/write-matrices-as-binary matrices binary-file)
         result   (binary/read-matrices-as-binary binary-file [:float :float :float :int])]
-    (is (= (:matrix (first matrices)) (first result)))
+    (is (= (->> (first matrices) :matrix m/matrix) (first result)))
 
-    (is (= (:matrix (second matrices)) (second result)))
+    (is (= (->> (second matrices) :matrix m/matrix) (second result)))
 
-    (is (= (:matrix (nth matrices 2)) (nth result 2)))
+    (is (= (->> (nth matrices 2) :matrix m/matrix) (nth result 2)))
 
-    (is (= (:matrix (nth matrices 3)) (nth result 3)))))
+    (is (= (->> (nth matrices 3) :matrix m/matrix) (nth result 3)))))
