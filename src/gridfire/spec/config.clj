@@ -69,7 +69,7 @@
              ::landfire-layers]
     :opt-un [::perturbations/perturbations
              ::ignition/ignition-layer
-             ::output/output-binary?
+             ::output/output-binary
              ::output/output-layers
              ::output/output-burn-probability
              ::spotting/spotting])

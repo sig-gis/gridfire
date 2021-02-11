@@ -3248,9 +3248,9 @@ or false:
      (m/zero-array [num-rows num-cols]))))
 
 (defn process-binary-output!
-  [{:keys [output-binary? output-directory]}
+  [{:keys [output-binary output-directory]}
    {:keys [burn-time-matrix flame-length-matrix spread-rate-matrix fire-type-matrix]} simulation]
-  (when output-binary?
+  (when output-binary
     (let [output-name (format "toa_0001_%04d.bin" (inc simulation))]
       (binary/write-matrices-as-binary [{:ttype  :float
                                          :matrix burn-time-matrix}
@@ -3410,6 +3410,10 @@ or false:
               num-rows          (m/row-count (:fuel-model landfire-rasters))
               num-cols          (m/column-count (:fuel-model landfire-rasters))
               burn-count-matrix (initialize-burn-count-matrix config max-runtimes num-rows num-cols)]
+          (when (:output-binary config)
+            (binary/write-bin-to-geotiff-config-file! "post-input.data"
+                                                      config
+                                                      (:fuel-model landfire-layers)))
           (when (:output-landfire-inputs? config)
             (doseq [[layer matrix] landfire-rasters]
               (-> (matrix-to-raster (name layer) matrix envelope)

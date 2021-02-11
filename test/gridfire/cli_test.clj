@@ -379,9 +379,9 @@
 
 (deftest binary-output-files-test
   (let [config         (merge test-config-base
-                              {:output-binary?     true
-                               :output-directory   "test/output"
-                               :fetch-layer-method :postgis})
+                              {:output-binary    {:num-timesteps 72
+                                                  :dt            3600}
+                               :output-directory "test/output"})
         _              (run-simulation config)
         binary-results (binary/read-matrices-as-binary (utils/out-file-path "toa_0001_0001.bin")
                                                        [:float :float :float :int])]

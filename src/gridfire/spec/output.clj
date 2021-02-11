@@ -17,7 +17,10 @@
 (s/def ::spread-rate ::type)
 (s/def ::output-burn-probability ::type)
 (s/def ::output-directory ::file-path)
-(s/def ::output-binary? boolean?)
+(s/def ::num-timesteps int?)
+(s/def ::dt int?)
+(s/def ::output-binary
+  (s/keys :req-un [::num-timesteps ::dt]))
 
 (s/def ::output-layers
   (common/one-or-more-keys

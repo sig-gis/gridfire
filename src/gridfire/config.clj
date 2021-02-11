@@ -123,7 +123,8 @@
            {:outfile-suffix          ""
             :output-landfire-inputs? false
             :output-geotiffs?        true
-            :output-binary?          true
+            :output-binary           {:num-timesteps 72
+                                      :dt            3600}
             :output-pngs?            (if verbose true false)
             :output-csvs?            true})))
 
