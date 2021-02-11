@@ -9,17 +9,19 @@
    post-processed raster values as a Clojure matrix using the core.matrix API
    along with all of the georeferencing information associated with this tile in a
    hash-map with the following form:
-  {:srid 900916,
-   :upperleftx -321043.875,
-   :upperlefty -1917341.5,
-   :width 486,
-   :height 534,
-   :scalex 2000.0,
-   :scaley -2000.0,
-   :skewx 0.0,
-   :skewy 0.0,
-   :numbands 10,
-   :matrix #vectorz/matrix Large matrix with shape: [10,534,486]}"
+   {:srid EPSG:32610,
+    :lowerleftx -2067000.0,
+    :lowerlefty 2459520.0,
+    :upperleftx -2067000.0,
+    :upperlefty 2460000.0,
+    :width 256,
+    :height 16,
+    :scalex 30.0,
+    :scaley -30.0,
+    :skewx 0.0,
+    :skewy 0.0,
+    :numbands 10,
+    :matrix #vectorz/matrix Large matrix with shape: [10,16,256]}"
   [file-path]
   (let [raster   (read-raster file-path)
         grid     (:grid raster)
@@ -28,6 +30,8 @@
         image    (:image r-info)
         envelope (:envelope r-info)]
     {:srid       (:srid r-info)
+     :lowerleftx (get-in envelope [:x :min])
+     :lowerlefty (get-in envelope [:y :min])
      :upperleftx (get-in envelope [:x :min])
      :upperlefty (get-in envelope [:y :max])
      :width      (:width image)

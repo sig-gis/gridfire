@@ -1,7 +1,9 @@
 (ns gridfire.binary-output
-  (:import (java.io DataInputStream DataOutputStream))
-  (:require [clojure.java.io :as io]
-            [clojure.core.matrix :as m]))
+  (:require [clojure.core.matrix :as m]
+            [clojure.java.io :as io]
+            [clojure.string :as s]
+            [gridfire.conversion :as convert])
+  (:import [java.io DataInputStream DataOutputStream]))
 
 ;; We assume that matrix[0,0] is the upper left corner.
 (defn non-zero-data [matrix]
@@ -97,5 +99,40 @@
     (.writeInt out 1)   ; Int32
     (.writeInt out 2))) ; Int32
 
-;; toa_test.bin was created with:
-;; (write-matrix-as-binary [[0 1 2] [3 0 4] [5 6 0]] "toa_test.bin")
+;;-----------------------------------------------------------------------------
+;; Post Process file
+;;-----------------------------------------------------------------------------
+
+(defn build-post-process-config
+  [{:keys [cell-size simulations output-binary]} raster]
+  (array-map
+   "NX"                (:width raster)
+   "NY"                (:height raster)
+   "NCASES"            simulations
+   "XLLCORNER"         (:lowerleftx raster)
+   "YLLCORNER"         (:lowerlefty raster)
+   "CELLSIZE"          (convert/ft->m cell-size)
+   "NUM_TIMESTEPS"     (:num-timesteps output-binary)
+   "DT"                (:dt output-binary)
+   "OUTPUTS_DIRECTORY" "/gridfire/output"
+   "POSTPROCESS_TYPE"  1
+   "BINARY_FILE_TYPE"  2
+   "PATH_TO_GDAL"      "/usr/bin/gdalinfo"
+   "SCRATCH"           "scratch"))
+
+(defn process-inputs [config]
+  (map (fn [[k v]]
+         (str (s/join "=" [k (str v)]) "\n"))
+       config))
+
+(defn write-bin-to-geotiff-config-file!
+  "Writes a configuration file for post processing binary files into geotiffs."
+  [file-name {:keys [output-directory] :as config} raster]
+  (with-open [out (io/writer (if output-directory
+                               (s/join "/" [output-directory file-name])
+                               file-name))]
+    (.write out (str "&ELMFIRE_POST_INPUTS\n"))
+    (let [entries (-> (build-post-process-config config raster)
+                      process-inputs)]
+      (doseq [entry entries]
+        (.write out entry)))))

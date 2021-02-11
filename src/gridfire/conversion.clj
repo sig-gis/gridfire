@@ -27,6 +27,11 @@
   [m]
   (* m 3.281))
 
+(defn ft->m
+  "Convert feet to meeter"
+  [ft]
+  (* 0.3048 ft))
+
 (defn mph->mps
   "Convert miles per hour to meters per second."
   [s]
@@ -49,3 +54,4 @@
   "Convert seconds to minutes."
   [s]
   (/ s 60))
+
