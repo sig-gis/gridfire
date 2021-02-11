@@ -60,7 +60,7 @@
                                  :data  (non-zero-data matrix)})
                               matrices)]
     (with-open [out (DataOutputStream. (io/output-stream file-name))]
-      (.writeInt out (int num-burned-cells))                   ; Int32
+      (.writeInt out (int num-burned-cells))                                  ; Int32
       (doseq [x (get-in (first data) [:data :x])] (.writeInt out (int x)))    ; Int32
       (doseq [y (get-in (first data) [:data :y])] (.writeInt out (int y)))    ; Int32
       (doseq [d data
@@ -104,21 +104,22 @@
 ;;-----------------------------------------------------------------------------
 
 (defn build-post-process-config
-  [{:keys [cell-size simulations output-binary]} raster]
+  [{:keys [cell-size simulations output-binary]} raster csv-filename]
   (array-map
-   "NX"                (:width raster)
-   "NY"                (:height raster)
-   "NCASES"            simulations
-   "XLLCORNER"         (:lowerleftx raster)
-   "YLLCORNER"         (:lowerlefty raster)
-   "CELLSIZE"          (convert/ft->m cell-size)
-   "NUM_TIMESTEPS"     (:num-timesteps output-binary)
-   "DT"                (:dt output-binary)
-   "OUTPUTS_DIRECTORY" "/gridfire/output"
-   "POSTPROCESS_TYPE"  1
-   "BINARY_FILE_TYPE"  2
-   "PATH_TO_GDAL"      "/usr/bin/gdalinfo"
-   "SCRATCH"           "scratch"))
+   "NX"                       (:width raster)
+   "NY"                       (:height raster)
+   "NCASES"                   simulations
+   "XLLCORNER"                (:lowerleftx raster)
+   "YLLCORNER"                (:lowerlefty raster)
+   "CELLSIZE"                 (convert/ft->m cell-size)
+   "NUM_TIMESTEPS"            (:num-timesteps output-binary)
+   "DT"                       (:dt output-binary)
+   "OUTPUTS_DIRECTORY"        "'/gridfire/output'"
+   "FIRE_SIZE_STATS_FILENAME" (str "'" csv-filename "'")
+   "POSTPROCESS_TYPE"         1
+   "BINARY_FILE_TYPE"         2
+   "PATH_TO_GDAL"             "'/usr/bin/gdalinfo'"
+   "SCRATCH"                  "'scratch'"))
 
 (defn process-inputs [config]
   (map (fn [[k v]]
@@ -127,12 +128,12 @@
 
 (defn write-bin-to-geotiff-config-file!
   "Writes a configuration file for post processing binary files into geotiffs."
-  [file-name {:keys [output-directory] :as config} raster]
+  [file-name {:keys [output-directory] :as config} raster csv-filename]
   (with-open [out (io/writer (if output-directory
                                (s/join "/" [output-directory file-name])
                                file-name))]
     (.write out (str "&ELMFIRE_POST_INPUTS\n"))
-    (let [entries (-> (build-post-process-config config raster)
+    (let [entries (-> (build-post-process-config config raster csv-filename)
                       process-inputs)]
       (doseq [entry entries]
         (.write out entry)))))

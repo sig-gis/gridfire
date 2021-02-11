@@ -275,7 +275,7 @@
   (when output-binary?
     (let [output-name (format "toa_0001_%05d.bin" (inc simulation))]
       (binary/write-matrices-as-binary [{:ttype  :float
-                                         :matrix burn-time-matrix}
+                                         :matrix (m/emap #(if (pos? %) (* 60 %) -1.0) burn-time-matrix)}
                                         {:ttype  :float
                                          :matrix flame-length-matrix}
                                         {:ttype  :float
