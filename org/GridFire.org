@@ -3133,15 +3133,18 @@ or false:
   ([config matrix name envelope simulation-id]
    (output-geotiff config matrix name envelope simulation-id nil))
 
-  ([{:keys [output-geotiffs? outfile-suffix] :as config}
+  ([{:keys [output-directory output-geotiffs? outfile-suffix] :as config}
     matrix name envelope simulation-id output-time]
    (when output-geotiffs?
-     (-> (matrix-to-raster name matrix envelope)
-         (write-raster (output-filename name
-                                        outfile-suffix
-                                        (str simulation-id)
-                                        output-time
-                                        ".tif"))))))
+     (let [file-name (output-filename name
+                                      outfile-suffix
+                                      (str simulation-id)
+                                      output-time
+                                      ".tif")]
+      (-> (matrix-to-raster name matrix envelope)
+          (write-raster (if output-directory
+                          (str/join "/" [output-directory file-name])
+                          file-name)))))))
 
 (defn output-png
   ([config matrix name envelope]
@@ -3150,16 +3153,19 @@ or false:
   ([config matrix name envelope simulation-id]
    (output-png config matrix name envelope simulation-id nil))
 
-  ([{:keys [output-png? outfile-suffix] :as config}
+  ([{:keys [output-directory output-png? outfile-suffix] :as config}
     matrix name envelope simulation-id output-time]
    (when output-png?
-     (save-matrix-as-png :color 4 -1.0
-                         matrix
-                         (output-filename name
-                                          outfile-suffix
-                                          (str simulation-id)
-                                          output-time
-                                          ".png")))))
+     (let [file-name (output-filename name
+                                      outfile-suffix
+                                      (str simulation-id)
+                                      output-time
+                                      ".png")]
+      (save-matrix-as-png :color 4 -1.0
+                          matrix
+                          (if output-directory
+                            (str/join "/" [output-directory file-name])
+                            (file-name)))))))
 
 (def layer-name->matrix
   [["fire_spread"         :fire-spread-matrix]
