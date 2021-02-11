@@ -435,7 +435,8 @@
           (when (:output-binary config)
             (binary/write-bin-to-geotiff-config-file! "post-input.data"
                                                       config
-                                                      (:fuel-model landfire-layers)))
+                                                      (:fuel-model landfire-layers)
+                                                      (str "summary_stats" (:outfile-suffix config) ".csv")))
           (when (:output-landfire-inputs? config)
             (doseq [[layer matrix] landfire-rasters]
               (-> (matrix-to-raster (name layer) matrix envelope)
