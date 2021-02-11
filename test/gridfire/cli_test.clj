@@ -383,6 +383,6 @@
                                                   :dt            3600}
                                :output-directory "test/output"})
         _              (run-simulation config)
-        binary-results (binary/read-matrices-as-binary (utils/out-file-path "toa_0001_0001.bin")
+        binary-results (binary/read-matrices-as-binary (utils/out-file-path "toa_0001_00001.bin")
                                                        [:float :float :float :int])]
     (is (some? binary-results))))
