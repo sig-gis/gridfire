@@ -118,7 +118,7 @@
    "FIRE_SIZE_STATS_FILENAME" (str "'" csv-filename "'")
    "POSTPROCESS_TYPE"         1
    "BINARY_FILE_TYPE"         2
-   "PATH_TO_GDAL"             "'/usr/bin/gdalinfo'"
+   "PATH_TO_GDAL"             "'/usr/bin/gdalinfo/'"
    "SCRATCH"                  "'scratch'"))
 
 (defn process-inputs [config]
