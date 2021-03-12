@@ -23,6 +23,9 @@
                              (if (int? response-port) response-port (Integer/parseInt response-port))
                              (json/write-str {:message "success"}))))
 
+(defn stop-server! []
+  (sockets/stop-server!))
+
 (defn start-server! [& args]
   (let [{:keys [options summary errors]} (parse-opts args cli-options)]
     (if (or (seq errors) (empty? options))
